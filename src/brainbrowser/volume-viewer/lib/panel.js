@@ -251,12 +251,29 @@
       * });
       * ```
       */
-      followPointer: function(pointer) {
-        var dx = pointer.x - old_pointer_position.x;
-        var dy = pointer.y - old_pointer_position.y;
 
-        panel.translateImage(dx, dy);
+      followPointer: function(pointer, dxy) {
+        var cursor;
+        if(dxy){
+          cursor = panel.getCursorPosition();
 
+          panel.image_center.x += dxy[0];
+          panel.image_center.y += dxy[1];
+          cursor.x += dxy[0];
+          cursor.y += dxy[1];
+        }else{
+          var dx = pointer.x - old_pointer_position.x;
+          var dy = pointer.y - old_pointer_position.y;
+          cursor = panel.getCursorPosition();
+
+          panel.image_center.x += dx;
+          panel.image_center.y += dy;
+          cursor.x += dx;
+          cursor.y += dy;
+
+          dxy = [dx, dy];
+        }
+        
         old_pointer_position.x = pointer.x;
         old_pointer_position.y = pointer.y;
 
@@ -283,6 +300,8 @@
         panel.image_center.y += dy;
 
         panel.updated = true;
+
+        return dxy;
       },
 
       /**

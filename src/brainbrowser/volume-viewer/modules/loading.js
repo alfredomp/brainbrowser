@@ -571,6 +571,7 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
 
           if(shift_key) {
             drag_delta = panel.followPointer(pointer);
+
             if (viewer.synced){
               viewer.volumes.forEach(function(synced_volume, synced_vol_id) {
                 var synced_panel;
