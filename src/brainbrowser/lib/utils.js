@@ -237,6 +237,7 @@
 
         mouse.x = x - offset.left;
         mouse.y = y - offset.top;
+
       }, false);
 
       element.addEventListener("mousedown", function(event) {
