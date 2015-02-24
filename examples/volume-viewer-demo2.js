@@ -761,6 +761,12 @@ $(function() {
         });
         viewer.volumes.forEach(function(volume){
           volume.display.forEach(function(panel) {
+            panel.invert_x = true;
+          });
+        });
+
+        viewer.volumes.forEach(function(volume){
+          volume.display.forEach(function(panel) {
             if(panel.axis === "xspace"){
               panel.invert_x = true;
             }
@@ -804,12 +810,17 @@ $(function() {
                 };
 
                 var drawMousePointer = function(x, y){
+
+                  // panel.drawMouse("#FFFFFF", {x:x, y:y});
                   
                   var volpos = panel.getVolumePosition(x, y);
                   if(volpos){
                     panel.drawCurrentSlice();
+
                     var cursorpos = panel.getCursorPosition(volpos.slice_x, volpos.slice_y);
                     panel.drawMousePointer("#FFFFFF", cursorpos);
+
+
                   }
                 }
 
