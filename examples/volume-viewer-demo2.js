@@ -810,8 +810,6 @@ $(function() {
                 };
 
                 var drawMousePointer = function(x, y){
-
-                  // panel.drawMouse("#FFFFFF", {x:x, y:y});
                   
                   var volpos = panel.getVolumePosition(x, y);
                   if(volpos){

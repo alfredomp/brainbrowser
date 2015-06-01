@@ -519,7 +519,10 @@
         var tm = null;
         
         context.globalAlpha = 255;
-        context.clearRect(-canvas.width, -canvas.height, 2*canvas.width, 2*canvas.height);
+        context.save();
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.restore();
 
         if(panel.invert_x){
           panel.transformation_matrix = [-panel.zoom, 0, 0, panel.zoom, panel.image_translate.x, panel.image_translate.y];
@@ -547,7 +550,11 @@
           for(var i = 0; i < panel.canvas_layers.length; i++){
             var canvas_layer = panel.canvas_layers[i];
             var ctx = canvas_layer.canvas.getContext("2d");
-            ctx.clearRect(-canvas.width, -canvas.height, 2*canvas.width, 2*canvas.height);
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.restore();
+            ctx.imageSmoothingEnabled = panel.smooth_image;
             canvas_layer.draw(canvas_layer.canvas_buffer, ctx, params);
           }
         }
