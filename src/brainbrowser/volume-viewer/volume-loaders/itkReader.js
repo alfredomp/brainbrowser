@@ -40,7 +40,7 @@
       // Emscripten namespace
 
       var filename_url = description.url;
-      filename_url = filename_url.substr(filename_url.lastIndexOf('/') + 1)
+      filename_url = filename_url.substr(filename_url.lastIndexOf('/') + 1);
       if(filename_url.lastIndexOf('?') > 0){
         filename_url = filename_url.substr(0, filename_url.lastIndexOf('?') - 1);
       }
@@ -51,7 +51,6 @@
         var input_filepath = memory_dir + '/' + filename_url;
         FS.mkdir(memory_dir);
         FS.writeFile(input_filepath, new Uint8Array(imagedata), { encoding: 'binary' });
-        var stat = FS.stat(input_filepath);
         
         var itkImageJS = new Module.itkImageJS();
         itkImageJS.ReadImage(input_filepath);
