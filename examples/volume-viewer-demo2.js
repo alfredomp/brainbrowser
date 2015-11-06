@@ -676,8 +676,8 @@ $(function() {
     viewer.loadVolumes({
       volumes: [
         {
-          type: "nifti1",
-          nii_url: "models/T1.nii.gz",
+          type: "itkReader",
+          url: "models/T1.nii.gz",
           template: {
             element_id: "volume-ui-template",
             viewer_insert_class: "volume-viewer-display"
