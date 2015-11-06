@@ -1,0 +1,28 @@
+
+= Setting up itkImageJS
+
+To set up itkImageJS. 
+You must first compile ITK using emscripten. 
+
+Before you start: 
+
+1. I used 'Unix makefiles' to generate ITK and this project. 
+2. Please read the tutorial at http://www.kitware.com/blog/home/post/912[Kitware - ITK - EMSCRIPTEN]
+3. Once you compiled ITK, run the following command. 
+
+[source, bash]
+----
+cd itkImageJS
+mkdir bin
+ccmake -DCMAKE_TOOLCHAIN_FILE=$EMSCRIPTEN/cmake/Modules/Platform/Emscripten.cmake ../
+----
+
+4. Configure the project by giving the path were you compiled ITK.
+5. Compile the project
+
+[source, bash]
+----
+make
+----
+
+The output should produce itkImageJS.js
