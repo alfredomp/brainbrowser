@@ -18,6 +18,8 @@ EMSCRIPTEN_BINDINGS(itk_image_j_s) {
     .function("GetPixelWorld", &itkImageJS::GetPixelWorld)
     .function("SetPixel", &itkImageJS::SetPixel)
     .function("GetDataType", &itkImageJS::GetDataType)
+    .function("GetFilename", &itkImageJS::GetFilename)
+    .function("SetFilename", &itkImageJS::SetFilename)
     ;
 }
 
@@ -68,12 +70,13 @@ void itkImageJS::MountDirectory(const string filename){
 * If executing inside NODE.js use mound directory with the image filename. 
 */
 
-  void itkImageJS::ReadImage(string filename){
+  void itkImageJS::ReadImage(){
 
     try{
       
       ImageFileReader::Pointer reader = ImageFileReader::New();
-      reader->SetFileName(filename.c_str());
+      char* filename = (char*)this->GetFilename();
+      reader->SetFileName(filename);
       reader->Update();
 
       this->SetImage(reader->GetOutput());
@@ -115,11 +118,12 @@ void itkImageJS::MountDirectory(const string filename){
   /*
   * Write the image to to the file system. 
   */
-  void itkImageJS::WriteImage(string filename){
+  void itkImageJS::WriteImage(){
     try{
     
       ImageFileWriter::Pointer writer = ImageFileWriter::New();
-      writer->SetFileName(filename.c_str());
+      char* filename = (char*)this->GetFilename();
+      writer->SetFileName(filename);
       writer->SetInput(this->GetImage());
       writer->Update();
     }catch(itk::ExceptionObject & err){

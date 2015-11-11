@@ -43,9 +43,9 @@ public:
 
   void MountDirectory(const string filename);
 
-  void ReadImage(string filename);
+  void ReadImage();
 
-  void WriteImage(string filename);
+  void WriteImage();
 
   int GetBufferPointer(){
     int buffer = (int)this->GetImage()->GetBufferPointer();
@@ -105,6 +105,14 @@ public:
       return 512;
     }
     return 16;
+  }
+
+  int GetFilename(){
+    return (int) m_Filename.c_str();
+  }
+
+  void SetFilename(string filename){
+    m_Filename = filename;
   }
 
   InputImagePointerType GetImage() const { return m_Image; }
