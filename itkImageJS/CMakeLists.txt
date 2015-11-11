@@ -2,7 +2,7 @@
 
 cmake_minimum_required(VERSION 3.3)
 
-SET(FLAGS "--bind -Wno-warn-absolute-paths --memory-init-file 0 -s DISABLE_EXCEPTION_CATCHING=0 -s ALLOW_MEMORY_GROWTH=1")
+SET(FLAGS "--bind -Wno-warn-absolute-paths --memory-init-file 0 -s DISABLE_EXCEPTION_CATCHING=0 -s ALLOW_MEMORY_GROWTH=1" )
 
 SET (CMAKE_CXX_FLAGS ${FLAGS} CACHE STRING "compile flags" FORCE)
 SET (CMAKE_C_FLAGS ${FLAGS} CACHE STRING "compile flags" FORCE)

@@ -33,30 +33,42 @@
   var VolumeViewer = BrainBrowser.VolumeViewer;
   var image_creation_context = document.createElement("canvas").getContext("2d");
 
+  VolumeViewer.volume_loaders.itkReaderURLMap = {};
+
   VolumeViewer.volume_loaders.itkReader = function(description, callback) {
     var error_message;
     if (description.url) {
 
       // Emscripten namespace
 
-      var filename_url = description.url;
-      filename_url = filename_url.substr(filename_url.lastIndexOf('/') + 1);
-      if(filename_url.lastIndexOf('?') > 0){
-        filename_url = filename_url.substr(0, filename_url.lastIndexOf('?') - 1);
-      }
-
       BrainBrowser.loader.loadFromURL(description.url, function(imagedata) {
 
         var memory_dir = '/raw';
-        var input_filepath = memory_dir + '/' + filename_url;
-        FS.mkdir(memory_dir);
+
+        try{
+          FS.stat(memory_dir);
+        }catch(e){
+          FS.mkdir(memory_dir);
+        }
+
+        if(VolumeViewer.volume_loaders.itkReaderURLMap[description.url] === undefined){
+          var filename_url = description.url;
+          filename_url = filename_url.substr(filename_url.lastIndexOf('/') + 1);
+          if(filename_url.lastIndexOf('?') > 0){
+            filename_url = filename_url.substr(0, filename_url.indexOf('?'));
+          }
+          VolumeViewer.volume_loaders.itkReaderURLMap[description.url] = memory_dir + '/' + Date.now() + '_' + filename_url;
+        }
+
+        var input_filepath = VolumeViewer.volume_loaders.itkReaderURLMap[description.url];
         FS.writeFile(input_filepath, new Uint8Array(imagedata), { encoding: 'binary' });
         
-        var itkImageJS = new Module.itkImageJS();
-        itkImageJS.ReadImage(input_filepath);
+        var itkJS = new Module.itkImageJS();
+        itkJS.SetFilename(input_filepath);
+        itkJS.ReadImage();
 
-        createHeader(itkImageJS, function(header){
-          createVolume(itkImageJS, header, callback);
+        createHeader(itkJS, function(header){
+          createVolume(itkJS, header, callback);
         });
 
       }, { result_type: "arraybuffer" });
@@ -71,7 +83,7 @@
     
   };
 
-  function createHeader(itkImageJS, callback){
+  function createHeader(itkJS, callback){
     var header = {
       order: ["zspace", "yspace", "xspace"],
       xspace: {},
@@ -79,40 +91,37 @@
       zspace: {}
     };
 
-    var dim = Module.HEAP32.subarray(itkImageJS.GetDimensions(), itkImageJS.GetDimensions() + 3);
+    var dim = Module.HEAP32.subarray(itkJS.GetDimensions(), itkJS.GetDimensions() + 3);
 
     header.xspace.space_length = dim[0];
     header.yspace.space_length = dim[1];
     header.zspace.space_length = dim[2];
 
-    var spc = Module.HEAPF64.subarray(itkImageJS.GetSpacing(), itkImageJS.GetSpacing() + 3);
+    var spc = Module.HEAPF64.subarray(itkJS.GetSpacing(), itkJS.GetSpacing() + 3);
         
     header.xspace.step = spc[0];
     header.yspace.step = spc[1];
     header.zspace.step = spc[2];
 
-    var ori = Module.HEAPF64.subarray(itkImageJS.GetOrigin(), itkImageJS.GetOrigin() + 3);
+    var ori = Module.HEAPF64.subarray(itkJS.GetOrigin(), itkJS.GetOrigin() + 3);
     
     header.xspace.start = ori[0];
     header.yspace.start = ori[1];
     header.zspace.start = ori[2];
 
-    var dir = Module.HEAPF64.subarray(itkImageJS.GetDirection(), itkImageJS.GetDirection() + 9);
+    var dir = Module.HEAPF64.subarray(itkJS.GetDirection(), itkJS.GetDirection() + 9);
 
     header.xspace.direction_cosines = [dir[0], dir[1], dir[2]];
     header.yspace.direction_cosines = [dir[3], dir[4], dir[5]];
     header.zspace.direction_cosines = [dir[6], dir[7], dir[8]];
-
-    
-    
 
     if (BrainBrowser.utils.isFunction(callback)) {
       callback(header);
     }
   }
 
-  function createVolume(itkImageJS, header, callback) {
-    var byte_data = createImageData(itkImageJS, header);
+  function createVolume(itkJS, header, callback) {
+    var byte_data = createImageData(itkJS, header);
 
     var intensitymin = Number.MAX_VALUE;
     var intensitymax = -Number.MAX_VALUE;
@@ -132,6 +141,7 @@
       intensity_max: intensitymax,
       slice_image: {},
       slice_data: {},
+      itk_image_j_s: itkJS,
       slice: function(axis, slice_num, time) {
         slice_num = slice_num === undefined ? volume.position[axis] : slice_num;
         time = time === undefined ? volume.current_time : time;
@@ -422,14 +432,14 @@
     }
   }
 
-  function createImageData(itkImageJS, header) {
+  function createImageData(itkJS, header) {
     
     var native_data = null;
 
-    var buff = itkImageJS.GetBufferPointer();
-    var buffsize = itkImageJS.GetBufferSize();
+    var buff = itkJS.GetBufferPointer();
+    var buffsize = itkJS.GetBufferSize();
 
-    switch (itkImageJS.GetDataType()) {
+    switch (itkJS.GetDataType()) {
     case 2:                     // DT_UNSIGNED_CHAR
       // no translation necessary; could optimize this out.
       native_data = Module.HEAPU8.subarray(buff, buff + buffsize);
@@ -458,7 +468,7 @@
       break;
     default:
       // We don't yet support 64-bit, complex, RGB, and float 128 types.
-      var error_message = "Unsupported data type: " + itkImageJS.GetDataType();
+      var error_message = "Unsupported data type: " + itkJS.GetDataType();
       BrainBrowser.events.triggerEvent("error", { message: error_message });
       throw new Error(error_message);
     }

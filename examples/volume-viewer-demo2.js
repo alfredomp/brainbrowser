@@ -686,8 +686,8 @@ $(function() {
           // style : "display : none"
         },
         {
-          type: "nifti1",
-          nii_url: "models/T1_aseg.nii",
+          type: "itkReader",
+          url: "models/T1_aseg.nii",
           template: {
             element_id: "volume-ui-template",
             viewer_insert_class: "volume-viewer-display"
