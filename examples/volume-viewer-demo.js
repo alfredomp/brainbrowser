@@ -127,7 +127,7 @@ $(function() {
         viewer.loadVolumes({
           volumes: [
             {
-              type: "mgh",
+              type: "itkReader",
               url: "models/t1.mgh",
               template: {
                 element_id: "volume-ui-template",
