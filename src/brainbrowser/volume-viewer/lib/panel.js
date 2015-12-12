@@ -524,12 +524,17 @@
         context.clearRect(0, 0, canvas.width, canvas.height);
         context.restore();
 
-        if(panel.invert_x){
-          panel.transformation_matrix = [-panel.zoom, 0, 0, panel.zoom, panel.image_translate.x, panel.image_translate.y];
-        }else{
-          panel.transformation_matrix = [panel.zoom, 0, 0, panel.zoom, panel.image_translate.x, panel.image_translate.y];
-        }
+        var header_axis = panel.volume.header[panel.axis];
+        var translate_x = panel.image_translate.x - (header_axis.width_space.start + Math.abs(header_axis.width_space.space_length*header_axis.width_space.step/2))*panel.zoom;
+        var translate_y = panel.image_translate.y - (header_axis.height_space.start + Math.abs(header_axis.height_space.space_length*header_axis.height_space.step/2))*panel.zoom;
+        
 
+        if(panel.invert_x){
+          panel.transformation_matrix = [-panel.zoom, 0, 0, panel.zoom, translate_x, translate_y];
+        }else{
+          panel.transformation_matrix = [panel.zoom, 0, 0, panel.zoom, translate_x, translate_y];
+        }
+        
         tm = panel.transformation_matrix;
         context.setTransform(tm[0], tm[1], tm[2], tm[3], tm[4], tm[5]);
 
@@ -775,8 +780,8 @@
   // Get the origin at which slices should be drawn.
   function getDrawingOrigin(panel) {
     var slice = panel.slice;
-    var x = -Math.abs(slice.width_space.step * slice.width_space.space_length)/2;
-    var y = -Math.abs(slice.height_space.step * slice.height_space.space_length)/2;
+    var x = slice.width_space.start;
+    var y = slice.height_space.start;
     
     return {
       x: x,
