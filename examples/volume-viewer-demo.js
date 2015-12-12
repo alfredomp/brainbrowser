@@ -135,7 +135,7 @@ $(function() {
               }
             },
             {
-              type: 'mgh',
+              type: 'itkReader',
               url: "models/dti.mgh",
               template: {
                 element_id: "volume-ui-template",
@@ -273,7 +273,7 @@ $(function() {
     $("#volume-file-mgh-submit").click(function() {
       viewer.clearVolumes();
       viewer.loadVolume({
-        type: "mgh",
+        type: "itkReader",
         file: document.getElementById("mgh-file"),
         template: {
           element_id: "volume-ui-template",
