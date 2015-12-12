@@ -510,6 +510,12 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
       canvasBuffer.width = volume.header[axis_name].width;
       canvasBuffer.height = volume.header[axis_name].height;
 
+      var canvas_layers = [];
+      canvas_layers.push({
+        canvas_buffer: canvasBuffer,
+        canvas: canvas
+      });
+
       var div = document.createElement("div");
       div.id = "div_" + axis_name + "_vol" + vol_id;
       div.appendChild(canvas);
@@ -523,7 +529,7 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
         view_description = volume_description.views_description[axis_name];
       }
 
-      var canvas_layers = [];
+      
 
       if(volume_description.canvas_layers){
 
@@ -535,7 +541,7 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
           canvas_layer.style.position = "absolute";
           canvas_layer.top = 5;
           canvas_layer.left = 5;
-          canvas_layer.style["z-index"] = i + 1;
+          canvas_layer.style["z-index"] = canvas_layers.length;
 
           var canvas_layer_buffer = document.createElement("canvas");
           canvas_layer_buffer.id = "canvas_layer_buffer_" + axis_name + "_vol" + vol_id;
@@ -551,9 +557,7 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
         }
       }
 
-      display.setPanel(
-        axis_name,
-        VolumeViewer.createPanel({
+      var panel = VolumeViewer.createPanel({
           volume: volume,
           volume_id: vol_id,
           axis: axis_name,
@@ -566,7 +570,11 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
             x: default_panel_width/2,
             y: default_panel_height/2
           }
-        })
+        });
+
+      display.setPanel(
+        axis_name,
+        panel
       );
     });
 
