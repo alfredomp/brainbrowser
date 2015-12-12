@@ -15,3 +15,4 @@ examples/models/*.headers
 examples/models/*.raw
 examples/models/*.json
 binjs
+bin
