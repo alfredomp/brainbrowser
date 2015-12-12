@@ -224,7 +224,14 @@
         
         return slice;
       },
-      
+
+      getVoxelMin: function(){
+        return intensitymin;
+      },
+
+      getVoxelMax: function(){
+        intensity_max: intensitymax;
+      },
 
       getSliceBorder: function(slice){
         var sliceOut = new slice.data.constructor(slice.data);
