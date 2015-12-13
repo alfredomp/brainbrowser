@@ -568,7 +568,25 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
         }
       });
 
+      var canvas_layer_cursor = document.createElement("canvas");
+      canvas_layer_cursor.id = "canvas_layer_" + panel.axis + "_cursor";
+      canvas_layer_cursor.width = default_panel_width;
+      canvas_layer_cursor.height = default_panel_height;
+      canvas_layer_cursor.style.position = "absolute";
+      canvas_layer_cursor.top = 5;
+      canvas_layer_cursor.left = 5;
+      canvas_layer_cursor.style["z-index"] = canvas_layers.length;
+
+      canvas_layers.push({
+        canvas: canvas_layer_cursor,
+        draw: panel.drawCursorLayer
+      });
+      div.appendChild(canvas_layer_cursor);
+
       BrainBrowser.events.addEventModel(panel);
+
+      panel.mouse = BrainBrowser.utils.captureMouse(canvas_layer_cursor);
+      panel.touches = BrainBrowser.utils.captureTouch(canvas_layer_cursor);
 
       canvas_layers[0].draw = function(buffer, ctx, params){
         panel.drawVolumeSlice(0, buffer, ctx, params);
