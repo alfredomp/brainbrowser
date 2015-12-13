@@ -517,15 +517,10 @@
         }else{
           panel.transformation_matrix = [panel.zoom, 0, 0, panel.zoom, translate_x, translate_y];
         }
-        
-        tm = panel.transformation_matrix;
-        context.setTransform(tm[0], tm[1], tm[2], tm[3], tm[4], tm[5]);
-
-        drawSlice(panel);
 
         if(panel.canvas_layers){
           var params = {
-            tm: tm,
+            tm: panel.transformation_matrix,
             width: panel.slice.width_space.space_length,
             width_spacing: Math.abs(panel.slice.width_space.step),
             height: panel.slice.height_space.space_length,
@@ -537,15 +532,15 @@
           };
           for(var i = 0; i < panel.canvas_layers.length; i++){
             var canvas_layer = panel.canvas_layers[i];
-            if(canvas_layer.draw){
-              var ctx = canvas_layer.canvas.getContext("2d");
-              ctx.save();
-              ctx.setTransform(1, 0, 0, 1, 0, 0);
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-              ctx.restore();
-              ctx.imageSmoothingEnabled = panel.smooth_image;
-              canvas_layer.draw(canvas_layer.canvas_buffer, ctx, params);
-            }
+            
+            var ctx = canvas_layer.canvas.getContext("2d");
+            ctx.imageSmoothingEnabled = panel.smooth_image;
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, canvas_layer.canvas.width, canvas_layer.canvas.height);
+            ctx.restore();
+            canvas_layer.draw(canvas_layer.canvas_buffer, ctx, params);
+            
           }
         }
         
@@ -593,7 +588,7 @@
         panel.updated = true;
       },
       drawCursorLayer : function(buffer, ctx, params){
-        var tm = params.tm;
+        var tm = params.tm;        
         ctx.setTransform(tm[0], tm[1], tm[2], tm[3], tm[4], tm[5]);
         drawCursor(panel, params.cursor_color, undefined, ctx);
       }
