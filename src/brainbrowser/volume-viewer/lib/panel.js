@@ -594,18 +594,24 @@
       },
 
       drawMousePointer : function(cursor_color, coords){
-        var tm = panel.transformation_matrix;
         var canvas = panel.canvas_layers[panel.canvas_layers.length - 1].canvas;
         var ctx = canvas.getContext("2d");
-        ctx.clearRect(-canvas.width, -canvas.height, 2*canvas.width, 2*canvas.height);
-        ctx.setTransform(tm[0], tm[1], tm[2], tm[3], tm[4], tm[5]);
-        drawCursor(panel, cursor_color, coords, ctx);
+
+        var params = {
+          tm: panel.transformation_matrix,
+          cursor_color: cursor_color
+        };
+
+        ctx.imageSmoothingEnabled = panel.smooth_image;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.canvas.width, canvas.canvas.height);
+        ctx.restore();
+
+        drawCursorLayer(undefined, ctx, params);
       },
       setDrawCursor : function(draw){
         panel.draw_cursor = draw;
-      },
-      drawCurrentSlice : function(){
-        drawSlice(panel);
       },
       setCursorSize : function(size){
         panel.cursor_size = size;
