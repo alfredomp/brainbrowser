@@ -572,29 +572,30 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
         }
       });
 
-      var canvas_layer_cursor = document.createElement("canvas");
-      canvas_layer_cursor.id = "canvas_layer_" + panel.axis + "_cursor";
-      canvas_layer_cursor.width = default_panel_width;
-      canvas_layer_cursor.height = default_panel_height;
-      canvas_layer_cursor.style.position = "absolute";
-      canvas_layer_cursor.top = 5;
-      canvas_layer_cursor.left = 5;
-      canvas_layer_cursor.style["z-index"] = canvas_layers.length;
+      for(var i = 0; i < volumes_length; i++){
+        var current_vol_id = {
+          current_vol_id: i
+        };
+        var drawVolumeSlice = function(buffer, ctx, params){
+          panel.drawVolumeSlice(this.current_vol_id, buffer, ctx, params);
+        }
+        canvas_layers[i].draw = drawVolumeSlice.bind(current_vol_id);
+      }
 
-      canvas_layers.push({
-        canvas: canvas_layer_cursor,
-        draw: panel.drawCursorLayer
-      });
-      div.appendChild(canvas_layer_cursor);
+      var canvas_layer_cursor = createCanvas("canvas_layer_" + panel.axis + "_cursor", default_panel_width, default_panel_height, canvas_layers.length);
+      canvas_layer_cursor.canvas.style.backgroundColor = "transparent";
+      canvas_layer_cursor.draw = panel.drawCursorLayer;
+
+      canvas_layers.push(canvas_layer_cursor);
+
+      for(var i = 0; i < canvas_layers.length; i++){
+        div.appendChild(canvas_layers[i].canvas);
+      }
 
       BrainBrowser.events.addEventModel(panel);
 
-      panel.mouse = BrainBrowser.utils.captureMouse(canvas_layer_cursor);
-      panel.touches = BrainBrowser.utils.captureTouch(canvas_layer_cursor);
-
-      canvas_layers[0].draw = function(buffer, ctx, params){
-        panel.drawVolumeSlice(0, buffer, ctx, params);
-      };
+      panel.mouse = BrainBrowser.utils.captureMouse(canvas_layer_cursor.canvas);
+      panel.touches = BrainBrowser.utils.captureTouch(canvas_layer_cursor.canvas);
 
       display.setPanel(
         axis_name,
