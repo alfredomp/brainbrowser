@@ -606,6 +606,18 @@
       drawCursorLayer : function(buffer, ctx, params){
         var tm = params.tm;        
         ctx.setTransform(tm[0], tm[1], tm[2], tm[3], tm[4], tm[5]);
+
+        if(panel.view_description){
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          for(var i = 0; i < panel.view_description.length; i++){
+            var desc = panel.view_description[i];
+            ctx.fillStyle = "rgba(255,255,255,1)";
+            ctx.fillText(desc.text, desc.x * ctx.canvas.width, desc.y*ctx.canvas.height);
+          }
+          ctx.restore();
+        }
+
         drawCursor(panel, params.cursor_color, undefined, ctx);
       }
 
