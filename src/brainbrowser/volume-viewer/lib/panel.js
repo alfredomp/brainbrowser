@@ -215,12 +215,6 @@
         width = width > 0 ? width : 0;
         height = height > 0 ? height : 0;
 
-        panel.canvas.width = width;
-        panel.canvas.height = height;
-
-        panel.canvas_div.style.width = width + 10;
-        panel.canvas_div.style.height = height + 10;
-
         if(panel.canvas_layers){
           for(var i = 0; i < panel.canvas_layers.length; i++){
             var canvas_layer = panel.canvas_layers[i].canvas;
