@@ -544,26 +544,34 @@
           }
         }
         
+        var canvas_layer = panel.canvas_layers[0];
+        var ctx = canvas_layer.canvas.getContext("2d");
         panel.triggerEvent("draw", {
           volume: panel.volume,
           cursor: cursor,
-          canvas: canvas,
-          context: context
+          canvas: canvas_layer,
+          context: ctx
         });       
 
 
         if (active) {
-          context.save();
-          context.setTransform(1, 0, 0, 1, 0, 0);
-          context.strokeStyle = "#EC2121";
-          context.lineWidth = frame_width;
-          context.strokeRect(
+          canvas_layer = panel.canvas_layers[panel.canvas_layers.length - 1];
+          ctx = canvas_layer.canvas.getContext("2d");
+
+          var frame_width = 4;
+          var half_frame_width = frame_width / 2;
+
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.strokeStyle = "#EC2121";
+          ctx.lineWidth = frame_width;
+          ctx.strokeRect(
             half_frame_width,
             half_frame_width,
-            canvas.width - frame_width,
-            canvas.height - frame_width
+            ctx.canvas.width - frame_width,
+            ctx.canvas.height - frame_width
           );
-          context.restore();
+          ctx.restore();
         }
 
         panel.updated = false;
