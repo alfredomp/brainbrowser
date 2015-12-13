@@ -529,8 +529,6 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
         view_description = volume_description.views_description[axis_name];
       }
 
-      
-
       if(volume_description.canvas_layers){
 
         for(var i = 0; i < volume_description.canvas_layers.length; i++){
@@ -558,19 +556,23 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
       }
 
       var panel = VolumeViewer.createPanel({
-          volume: volume,
-          volume_id: vol_id,
-          axis: axis_name,
-          canvas_div: div,
-          canvas: canvas,
-          canvas_buffer: canvasBuffer,
-          view_description: view_description,
-          canvas_layers: canvas_layers,
-          image_translate: {
-            x: default_panel_width/2,
-            y: default_panel_height/2
-          }
-        });
+        volume: volume,
+        volume_id: vol_id,
+        axis: axis_name,
+        canvas_div: div,
+        view_description: view_description,
+        canvas_layers: canvas_layers,
+        image_translate: {
+          x: default_panel_width/2,
+          y: default_panel_height/2
+        }
+      });
+
+      BrainBrowser.events.addEventModel(panel);
+
+      canvas_layers[0].draw = function(buffer, ctx, params){
+        panel.drawVolumeSlice(0, buffer, ctx, params);
+      };
 
       display.setPanel(
         axis_name,
