@@ -472,6 +472,33 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
     return template_elements;
   }
 
+  function createCanvas(canvas_id, panel_width, panel_height, z_index, buffer_params){
+    var canvas_layer = {};
+
+    var canvas = document.createElement("canvas");
+    canvas.id = canvas_id;
+    canvas.width = panel_width;
+    canvas.height = panel_height;
+    canvas.style.backgroundColor = "#000000";
+    canvas.style.position = "absolute";
+    canvas.top = 5;
+    canvas.left = 5;
+    canvas.style["z-index"] = z_index;
+
+    canvas_layer.canvas = canvas;
+
+    if(buffer_params){
+      var canvas_buffer = document.createElement("canvas");
+      canvas_buffer.width = buffer_params.width;
+      canvas_buffer.height = buffer_params.height;
+      canvas_layer.canvas_buffer = canvas_buffer;
+    }
+
+    return canvas_layer;
+
+    
+  }
+
   // Create canvases and add mouse interface.
   function createVolumeDisplay(dom_element, vol_id, volume_description) {
     var container = document.createElement("div");
@@ -495,34 +522,29 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
     
     views.forEach(function(axis_name) {
 
-      var canvas = document.createElement("canvas");
-      canvas.id = "canvas_" + axis_name + "_vol" + vol_id;
-      canvas.width = default_panel_width;
-      canvas.height = default_panel_height;
-      canvas.style.backgroundColor = "#000000";
-      canvas.style.position = "absolute";
-      canvas.top = 5;
-      canvas.left = 5;
-      canvas.style["z-index"] = 0;
-
-      var canvasBuffer = document.createElement("canvas");
-      canvasBuffer.id = "canvas_buffer_" + axis_name + "_vol" + vol_id;
-      canvasBuffer.width = volume.header[axis_name].width;
-      canvasBuffer.height = volume.header[axis_name].height;
-
-      var canvas_layers = [];
-      canvas_layers.push({
-        canvas_buffer: canvasBuffer,
-        canvas: canvas
-      });
-
       var div = document.createElement("div");
       div.id = "div_" + axis_name + "_vol" + vol_id;
-      div.appendChild(canvas);
       div.style.position = "relative";
       div.style.height = default_panel_height + 10 + "px";
       div.style.width = default_panel_width + 10 + "px";
       container.appendChild(div);
+
+      var buffer_params = {
+        width: volume.header[axis_name].width,
+        height: volume.header[axis_name].height
+      }
+
+      var canvas_layers = [];
+
+      var volumes_length = 1;
+      if(volume.type === 'overlay'){
+        volumes_length = volume.volumes.length;
+      }
+
+      for(var i = 0; i < volumes_length; i++){
+        var canvas_layer = createCanvas("canvas_" + axis_name + "_vol" + vol_id, default_panel_width, default_panel_height, i, buffer_params);
+        canvas_layers.push(canvas_layer);
+      }
 
       var view_description;
       if(volume_description.views_description && volume_description.views_description[axis_name]){
@@ -530,28 +552,10 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
       }
 
       if(volume_description.canvas_layers){
-
         for(var i = 0; i < volume_description.canvas_layers.length; i++){
-          var canvas_layer = document.createElement("canvas");
-          canvas_layer.id = "canvas_layer_" + axis_name + "_vol" + vol_id;
-          canvas_layer.width = default_panel_width;
-          canvas_layer.height = default_panel_height;
-          canvas_layer.style.position = "absolute";
-          canvas_layer.top = 5;
-          canvas_layer.left = 5;
-          canvas_layer.style["z-index"] = canvas_layers.length;
-
-          var canvas_layer_buffer = document.createElement("canvas");
-          canvas_layer_buffer.id = "canvas_layer_buffer_" + axis_name + "_vol" + vol_id;
-          canvas_layer_buffer.width = volume.header[axis_name].width;
-          canvas_layer_buffer.height = volume.header[axis_name].height;
-
-          canvas_layers.push({
-            canvas_buffer: canvas_layer_buffer,
-            canvas: canvas_layer,
-            draw: volume_description.canvas_layers[i].draw
-          });
-          div.appendChild(canvas_layer);
+          var canvas_layer = createCanvas("canvas_layer_" + axis_name + "_vol" + vol_id, default_panel_width, default_panel_height, canvas_layers.length, buffer_params);
+          canvas_layer.draw = volume_description.canvas_layers[i].draw;
+          canvas_layers.push(canvas_layer);
         }
       }
 
