@@ -728,35 +728,6 @@
 
   }
 
-  // Draw the current slice to the canvas.
-  function drawSlice(panel) {
-    var image = panel.slice_image;
-    var origin;
-    
-    var image_width = Math.abs(panel.slice.width_space.space_length*panel.slice.width_space.step);
-    var image_height = Math.abs(panel.slice.height_space.space_length*panel.slice.height_space.step);
-
-    if (image) {
-      origin = getDrawingOrigin(panel);
-
-      panel.context.imageSmoothingEnabled = panel.smooth_image;
-      panel.context_buffer.putImageData(image, 0, 0);
-      panel.context.drawImage(panel.canvas_buffer, origin.x, origin.y, image_width, image_height );
-      
-    }
-
-    if(panel.view_description){
-      panel.context.save();
-      panel.context.setTransform(1, 0, 0, 1, 0, 0);
-      for(var i = 0; i < panel.view_description.length; i++){
-        var desc = panel.view_description[i];
-        panel.context.fillStyle = "rgba(255,255,255,1)";
-        panel.context.fillText(desc.text, desc.x * panel.canvas.width, desc.y*panel.canvas.height);
-      }
-      panel.context.restore();
-    }
-  }
-
   // Get the origin at which slices should be drawn.
   function getDrawingOrigin(panel) {
     var slice = panel.slice;
