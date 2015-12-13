@@ -629,34 +629,6 @@
       }
     });
 
-    var canvas_layer_cursor = document.createElement("canvas");
-    canvas_layer_cursor.id = "canvas_layer_" + panel.axis + "_cursor";
-    canvas_layer_cursor.width = panel.canvas.width;
-    canvas_layer_cursor.height = panel.canvas.height;
-    canvas_layer_cursor.style.position = "absolute";
-    canvas_layer_cursor.top = 5;
-    canvas_layer_cursor.left = 5;
-    canvas_layer_cursor.style["z-index"] = panel.canvas_layers.length + 1;
-
-    panel.canvas_layers.push({
-      canvas: canvas_layer_cursor,
-      draw: panel.drawCursorLayer
-    });
-    options.canvas_div.appendChild(canvas_layer_cursor);
-
-    BrainBrowser.events.addEventModel(panel);
-
-    if (panel.canvas && BrainBrowser.utils.isFunction(panel.canvas.getContext)) {
-      panel.context = panel.canvas.getContext("2d");
-      panel.context_buffer = panel.canvas_buffer.getContext("2d");
-      var canvas = panel.canvas;
-      if(panel.canvas_layers && panel.canvas_layers.length > 0){
-        canvas = panel.canvas_layers[panel.canvas_layers.length - 1].canvas;
-      }
-      panel.mouse = BrainBrowser.utils.captureMouse(canvas);
-      panel.touches = BrainBrowser.utils.captureTouch(canvas);
-    }
-
     if (panel.volume) {
       setSlice(panel, panel.volume.slice(panel.axis));
     }
