@@ -569,6 +569,22 @@
         panel.updated = false;
       },
 
+      drawVolumeSlice: function(volume_id, buffer, ctx, params){
+
+        var slice = panel.volume.slice(panel.axis);
+        var image = panel.volume.getSliceImage(slice, panel.zoom, panel.contrast, panel.brightness);
+        var image_width = Math.abs(slice.width_space.space_length*slice.width_space.step);
+        var image_height = Math.abs(slice.height_space.space_length*slice.height_space.step);
+        var ctx_buffer = buffer.getContext("2d");
+
+        if (image) {
+          var origin = params.origin;
+          ctx_buffer.putImageData(image, 0, 0);
+          ctx.setTransform(params.tm[0], params.tm[1], params.tm[2], params.tm[3], params.tm[4], params.tm[5]);
+          ctx.drawImage(buffer, origin.x, origin.y, image_width, image_height );
+        }
+      },
+
       drawMousePointer : function(cursor_color, coords){
         var tm = panel.transformation_matrix;
         var canvas = panel.canvas_layers[panel.canvas_layers.length - 1].canvas;
