@@ -584,14 +584,16 @@
         var ctx_buffer = buffer.getContext("2d");
 
         if (image) {
-          var origin = params.origin;
+          var origin = {};
+          origin.x = volume.header[panel.axis].width_space.start;
+          origin.y = volume.header[panel.axis].height_space.start;
           ctx_buffer.putImageData(image, 0, 0);
           ctx.setTransform(params.tm[0], params.tm[1], params.tm[2], params.tm[3], params.tm[4], params.tm[5]);
           ctx.drawImage(buffer, origin.x, origin.y, image_width, image_height );
         }
       },
 
-      drawMousePointer : function(cursor_color, coords){
+      drawMousePointer : function(cursor_color){
         var canvas = panel.canvas_layers[panel.canvas_layers.length - 1].canvas;
         var ctx = canvas.getContext("2d");
 
@@ -606,7 +608,7 @@
         ctx.clearRect(0, 0, canvas.canvas.width, canvas.canvas.height);
         ctx.restore();
 
-        drawCursorLayer(undefined, ctx, params);
+        panel.drawCursorLayer(undefined, ctx, params);
       },
       setDrawCursor : function(draw){
         panel.draw_cursor = draw;
@@ -616,7 +618,7 @@
         panel.updated = true;
       },
       drawCursorLayer : function(buffer, ctx, params){
-        var tm = params.tm;        
+        var tm = params.tm;
         ctx.setTransform(tm[0], tm[1], tm[2], tm[3], tm[4], tm[5]);
 
         if(panel.view_description){
@@ -642,7 +644,8 @@
     });
 
     if (panel.volume) {
-      setSlice(panel, panel.volume.slice(panel.axis));
+      var slice_num = panel.volume.header[panel.axis].space_length/2 | 0;
+      setSlice(panel, panel.volume.slice(panel.axis, slice_num));
     }
 
     return panel;
