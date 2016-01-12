@@ -169,8 +169,6 @@
         }
         var slice_data = volume.slice_data[axis];
 
-        var slice;
-
         // Rows and colums of the result slice.
         var row, col;
 
