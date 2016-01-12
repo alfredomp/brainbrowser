@@ -585,13 +585,14 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
         }
       });
 
-      for(var i = 0; i < volumes_length; i++){
+      var drawVolumeSlice = function(buffer, ctx, params){
+        panel.drawVolumeSlice(this.current_vol_id, buffer, ctx, params);
+      };
+
+      for(i = 0; i < volumes_length; i++){
         var current_vol_id = {
           current_vol_id: i
         };
-        var drawVolumeSlice = function(buffer, ctx, params){
-          panel.drawVolumeSlice(this.current_vol_id, buffer, ctx, params);
-        }
         canvas_layers[i].draw = drawVolumeSlice.bind(current_vol_id);
       }
 
