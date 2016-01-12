@@ -225,7 +225,7 @@
       },
 
       getVoxelMax: function(){
-        intensity_max: intensitymax;
+        return intensitymax;
       },
 
       getSliceBorder: function(slice){
