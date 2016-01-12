@@ -532,17 +532,30 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
       var buffer_params = {
         width: volume.header[axis_name].width,
         height: volume.header[axis_name].height
-      }
+      };
 
       var canvas_layers = [];
 
+      var volumes = [volume];
       var volumes_length = 1;
       if(volume.type === 'overlay'){
         volumes_length = volume.volumes.length;
+        volumes = volume.volumes;
       }
 
-      for(var i = 0; i < volumes_length; i++){
-        var canvas_layer = createCanvas("canvas_" + axis_name + "_vol" + vol_id, default_panel_width, default_panel_height, i, buffer_params);
+      var i;
+      var canvas_layer;
+
+      for(i = 0; i < volumes_length; i++){
+        buffer_params = {
+          width: volumes[i].header[axis_name].width,
+          height: volumes[i].header[axis_name].height
+        };
+
+        canvas_layer = createCanvas("canvas_" + axis_name + "_vol" + vol_id, default_panel_width, default_panel_height, i, buffer_params);
+        if(i === 0){
+          canvas_layer.canvas.style.backgroundColor = "#000000";
+        }
         canvas_layers.push(canvas_layer);
       }
 
@@ -552,8 +565,8 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
       }
 
       if(volume_description.canvas_layers){
-        for(var i = 0; i < volume_description.canvas_layers.length; i++){
-          var canvas_layer = createCanvas("canvas_layer_" + axis_name + "_vol" + vol_id, default_panel_width, default_panel_height, canvas_layers.length, buffer_params);
+        for(i = 0; i < volume_description.canvas_layers.length; i++){
+          canvas_layer = createCanvas("canvas_layer_" + axis_name + "_vol" + vol_id, default_panel_width, default_panel_height, canvas_layers.length, buffer_params);
           canvas_layer.draw = volume_description.canvas_layers[i].draw;
           canvas_layers.push(canvas_layer);
         }
