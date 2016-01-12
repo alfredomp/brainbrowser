@@ -192,7 +192,7 @@
         z = z_positive ? slice_num : axis_space.space_length - slice_num - 1;
         tz_offset = time_offset + z * axis_space_offset;
 
-        for (row = height - 1; row >= 0; row--) {
+        for (row = 0; row < height; row++) {
           y = y_positive ? row : height - row - 1;
           tzy_offset = tz_offset + y * height_space_offset;
 
@@ -204,7 +204,7 @@
           }
         }
 
-        slice = {
+        var slice = {
           axis: axis,
           data: slice_data,
           width_space: width_space,
