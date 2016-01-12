@@ -505,8 +505,7 @@
         if (!panel.updated) {
           return;
         }
-
-        var cursor = panel.getCursorPosition();
+        
         var header_axis = panel.volume.header[panel.axis];
         var translate_x = panel.image_translate.x - (header_axis.width_space.start + Math.abs(header_axis.width_space.space_length*header_axis.width_space.step/2))*panel.zoom;
         var translate_y = panel.image_translate.y - (header_axis.height_space.start + Math.abs(header_axis.height_space.space_length*header_axis.height_space.step/2))*panel.zoom;
@@ -538,14 +537,15 @@
           canvas_layer.draw(canvas_layer.canvas_buffer, ctx, params);
         }
         
-        var canvas_layer = panel.canvas_layers[0];
-        var ctx = canvas_layer.canvas.getContext("2d");
+        
+        canvas_layer = panel.canvas_layers[0];
+        ctx = canvas_layer.canvas.getContext("2d");
         panel.triggerEvent("draw", {
           volume: panel.volume,
           cursor: cursor,
           canvas: canvas_layer,
           context: ctx
-        });       
+        });
 
 
         if (active) {
