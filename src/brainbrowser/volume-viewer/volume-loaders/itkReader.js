@@ -434,46 +434,49 @@
     }
   }
 
-  function createImageData(itkJS, header) {
-    
+  function createDataView(type, buffer, size){
     var native_data = null;
+    switch (type) {
+    case 2:                     // DT_UNSIGNED_CHAR
+      native_data = Module.HEAPU8.subarray(buffer, buffer + size);
+      break;
+    case 4:                     // DT_SIGNED_SHORT
+      native_data = Module.HEAP16.subarray(buffer, buffer + size);
+      break;
+    case 8:                     // DT_SIGNED_INT
+      native_data = Module.HEAP32.subarray(buffer, buffer + size);
+      break;
+    case 16:                    // DT_FLOAT
+      native_data = Module.HEAPF32.subarray(buffer, buffer + size);
+      break;
+    case 32:                    // DT_DOUBLE
+      native_data = Module.HEAPF64.subarray(buffer, buffer + size);
+      break;
+    // Values above 256 are NIfTI-specific, and rarely used.
+    case 256:                   // DT_INT8
+      native_data = Module.HEAP8.subarray(buffer, buffer + size);
+      break;
+    case 512:                   // DT_UINT16
+      native_data = Module.HEAPU16.subarray(buffer, buffer + size);
+      break;
+    case 768:                   // DT_UINT32
+      native_data = Module.HEAPU32.subarray(buffer, buffer + size);
+      break;
+    default:
+      // We don't yet support 64-bit, complex, RGB, and float 128 types.
+      var error_message = "Unsupported data type: " + type;
+      BrainBrowser.events.triggerEvent("error", { message: error_message });
+      throw new Error(error_message);
+    }
+    return native_data;
+  }
+
+  function createImageData(itkJS, header) {
 
     var buff = itkJS.GetBufferPointer();
     var buffsize = itkJS.GetBufferSize();
 
-    switch (itkJS.GetDataType()) {
-    case 2:                     // DT_UNSIGNED_CHAR
-      // no translation necessary; could optimize this out.
-      native_data = Module.HEAPU8.subarray(buff, buff + buffsize);
-      break;
-    case 4:                     // DT_SIGNED_SHORT
-      native_data = Module.HEAP16.subarray(buff, buff + buffsize);
-      break;
-    case 8:                     // DT_SIGNED_INT
-      native_data = Module.HEAP32.subarray(buff, buff + buffsize);
-      break;
-    case 16:                    // DT_FLOAT
-      native_data = Module.HEAPF32.subarray(buff, buff + buffsize);
-      break;
-    case 32:                    // DT_DOUBLE
-      native_data = Module.HEAPF64.subarray(buff, buff + buffsize);
-      break;
-    // Values above 256 are NIfTI-specific, and rarely used.
-    case 256:                   // DT_INT8
-      native_data = Module.HEAP8.subarray(buff, buff + buffsize);
-      break;
-    case 512:                   // DT_UINT16
-      native_data = Module.HEAPU16.subarray(buff, buff + buffsize);
-      break;
-    case 768:                   // DT_UINT32
-      native_data = Module.HEAPU32.subarray(buff, buff + buffsize);
-      break;
-    default:
-      // We don't yet support 64-bit, complex, RGB, and float 128 types.
-      var error_message = "Unsupported data type: " + itkJS.GetDataType();
-      BrainBrowser.events.triggerEvent("error", { message: error_message });
-      throw new Error(error_message);
-    }
+    var native_data = createDataView(itkJS.GetDataType(), buff, buffsize);
 
     if(header.order.length === 4) {
       header.order = header.order.slice(1);
