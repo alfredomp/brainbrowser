@@ -573,10 +573,14 @@
 
       drawVolumeSlice: function(volume_id, buffer, ctx, params){
 
-        var slice = panel.volume.slice(panel.axis);
-        var image = panel.volume.getSliceImage(slice, panel.zoom, panel.contrast, panel.brightness);
-        var image_width = Math.abs(slice.width_space.space_length*slice.width_space.step);
-        var image_height = Math.abs(slice.height_space.space_length*slice.height_space.step);
+        var volume = panel.volume;
+        if(panel.volume.volumes){
+          volume = panel.volume.volumes[volume_id];
+        }
+        var slice = volume.slice(panel.axis);
+        var image = volume.getSliceImage(slice, panel.zoom, panel.contrast, panel.brightness);
+        var image_width = slice.width_space.space_length*slice.width_space.step;
+        var image_height = slice.height_space.space_length*slice.height_space.step;
         var ctx_buffer = buffer.getContext("2d");
 
         if (image) {
