@@ -510,13 +510,8 @@
         var header_axis = panel.volume.header[panel.axis];
         var translate_x = panel.image_translate.x - (header_axis.width_space.start + Math.abs(header_axis.width_space.space_length*header_axis.width_space.step/2))*panel.zoom;
         var translate_y = panel.image_translate.y - (header_axis.height_space.start + Math.abs(header_axis.height_space.space_length*header_axis.height_space.step/2))*panel.zoom;
-        
-
-        if(panel.invert_x){
-          panel.transformation_matrix = [-panel.zoom, 0, 0, panel.zoom, translate_x, translate_y];
-        }else{
-          panel.transformation_matrix = [panel.zoom, 0, 0, panel.zoom, translate_x, translate_y];
-        }
+        var canvas_layer;
+        var ctx;
 
         if(panel.canvas_layers){
           var params = {
