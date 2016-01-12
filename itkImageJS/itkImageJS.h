@@ -11,7 +11,10 @@
 #include <itkImage.h>
 #include <itkImageFileReader.h>
 #include <itkImageFileWriter.h>
-#include <itkLinearInterpolateImageFunction.h>
+#include <itkNearestNeighborInterpolateImageFunction.h>
+#include <itkImageSliceIteratorWithIndex.h>
+#include <itkOrientImageFilter.h>
+#include <itkExtractImageFilter.h>
 
 using namespace std;
 using namespace emscripten;
@@ -30,14 +33,32 @@ public:
   typedef typename InputImageType::RegionType RegionType;
   typedef typename InputImageType::SizeType SizeType;
   typedef typename InputImageType::DirectionType DirectionType;
+  typedef typename InputImageType::IndexType IndexType;
+
+  typedef itk::Image< PixelType, 2 >  ImageType2D;
+  typedef typename ImageType2D::Pointer ImagePointerType2D;
+  typedef ImageType2D::RegionType RegionType2D;
+  typedef ImageType2D::RegionType::SizeType SizeType2D;
+  typedef ImageType2D::RegionType::IndexType IndexType2D;
+
+  typedef itk::ExtractImageFilter< InputImageType, InputImageType > ExtractFilterType;
+  typedef typename ExtractFilterType::Pointer ExtractFilterPointerType;
+
+  typedef itk::ImageSliceIteratorWithIndex<InputImageType> ImageIteratorType;
+
+  typedef itk::ImageRegionIteratorWithIndex< ImageType2D > ImageIterator2DType;
   
   typedef itk::ImageFileReader< InputImageType > ImageFileReader;
   typedef itk::ImageFileWriter< InputImageType > ImageFileWriter;
 
-  typedef itk::LinearInterpolateImageFunction< InputImageType > InterpolateFunctionType;
+  typedef itk::NearestNeighborInterpolateImageFunction< InputImageType > InterpolateFunctionType;
   typedef typename InterpolateFunctionType::Pointer InterpolateFunctionPointerType;
 
+  typedef itk::OrientImageFilter< InputImageType, InputImageType > OrientImageFilterType;
+  typedef typename OrientImageFilterType::Pointer OrientImageFilterPointerType;
+
   itkImageJS();
+  ~itkImageJS();
 
   void Initialize();
 
@@ -121,6 +142,9 @@ public:
   InterpolateFunctionPointerType GetInterpolator() const { return m_Interpolate; }
   void SetInterpolator(InterpolateFunctionPointerType interpolate){ m_Interpolate = interpolate; }
 
+  int GetSlice(string axis, int slice);
+
+
 private:
   string m_Filename;
   InputImagePointerType m_Image;
@@ -130,6 +154,13 @@ private:
   int m_Size[3];
 
   InterpolateFunctionPointerType m_Interpolate;
+
+  typedef map< string, int > MapStringInt;
+  MapStringInt m_MapStringDirection;
+  vector< InputImagePointerType > m_VectorImageSlice;
+  vector< ExtractFilterPointerType > m_VectorExtractFilter;
+
+  
 };
 
 #endif

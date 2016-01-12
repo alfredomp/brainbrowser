@@ -11,6 +11,7 @@ set(ITK_IO_MODULES_USED
 		ITKIONIFTI
 		ITKIONRRD
 		MGHIO
+		ITKImageGrid
 	)
 find_package(ITK COMPONENTS
   ITKCommon

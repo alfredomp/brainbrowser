@@ -20,11 +20,15 @@ EMSCRIPTEN_BINDINGS(itk_image_j_s) {
     .function("GetDataType", &itkImageJS::GetDataType)
     .function("GetFilename", &itkImageJS::GetFilename)
     .function("SetFilename", &itkImageJS::SetFilename)
+    .function("GetSlice", &itkImageJS::GetSlice)
     ;
 }
 
 itkImageJS::itkImageJS(){
-  m_Interpolate = InterpolateFunctionType::New();  
+  m_Interpolate = InterpolateFunctionType::New();
+}
+
+itkImageJS::~itkImageJS(){
 }
 
 /*
@@ -78,10 +82,17 @@ void itkImageJS::MountDirectory(const string filename){
       char* filename = (char*)this->GetFilename();
       reader->SetFileName(filename);
       reader->Update();
+      InputImagePointerType image = reader->GetOutput();
 
-      this->SetImage(reader->GetOutput());
-      m_Interpolate->SetInputImage(this->GetImage());
+      OrientImageFilterPointerType orienter = OrientImageFilterType::New();
+      orienter->UseImageDirectionOn();
+      orienter->SetDesiredCoordinateOrientation(itk::SpatialOrientation::ITK_COORDINATE_ORIENTATION_LPI);
+      orienter->SetInput(image);
+      orienter->Update();
 
+      image = orienter->GetOutput();
+
+      this->SetImage(image);
       this->Initialize();
 
     }catch(itk::ExceptionObject & err){
@@ -94,6 +105,9 @@ void itkImageJS::MountDirectory(const string filename){
   * After reading the image, it sets up different attributes
   */
   void itkImageJS::Initialize(){
+
+    m_Interpolate->SetInputImage(this->GetImage());
+
     SizeType size = this->GetImage()->GetLargestPossibleRegion().GetSize();
     m_Size[0] = size[0];
     m_Size[1] = size[1];
@@ -103,8 +117,9 @@ void itkImageJS::MountDirectory(const string filename){
     m_Spacing[0] = spacing[0];
     m_Spacing[1] = spacing[1];
     m_Spacing[2] = spacing[2];
+    
+    vnl_vector<double> origin = this->GetImage()->GetOrigin().GetVnlVector()*this->GetImage()->GetDirection().GetVnlMatrix();
 
-    PointType origin = this->GetImage()->GetOrigin();
     m_Origin[0] = origin[0];
     m_Origin[1] = origin[1];
     m_Origin[2] = origin[2];
@@ -112,6 +127,18 @@ void itkImageJS::MountDirectory(const string filename){
     DirectionType direction = this->GetImage()->GetDirection();
     for(int i = 0; i < dimension*dimension; i++){
       m_Direction[i] = direction[i/dimension][i%dimension];
+    }
+    
+    m_MapStringDirection["xspace"] = 0;
+    m_MapStringDirection["yspace"] = 1;
+    m_MapStringDirection["zspace"] = 2;
+
+
+    for(int projectionDirection = 0; projectionDirection < 3; ++projectionDirection){
+      ExtractFilterPointerType extract = ExtractFilterType::New();
+      extract->SetInput(this->GetImage());
+      extract->SetDirectionCollapseToIdentity();
+      m_VectorExtractFilter.push_back(extract);
     }
   }
 
@@ -130,4 +157,31 @@ void itkImageJS::MountDirectory(const string filename){
       cerr<<err<<endl;
     }
 
+  }
+
+  /*
+  * Get a slice from the image
+  */
+  int itkImageJS::GetSlice(string axis, int slice_num){
+
+
+    int projectionDirection = m_MapStringDirection[axis];
+
+    ExtractFilterPointerType extract = m_VectorExtractFilter[projectionDirection];
+    RegionType region = this->GetImage()->GetLargestPossibleRegion();
+    region.SetSize(projectionDirection, 1);
+    region.SetIndex(projectionDirection, slice_num);
+
+    cout<<region<<endl;
+
+    try{
+      extract->SetExtractionRegion(region);
+      extract->Update();
+      
+      InputImagePointerType outimage = extract->GetOutput();
+      return (int)outimage->GetBufferPointer()/sizeof(PixelType);
+    }catch(itk::ExceptionObject &e){
+      cerr<<e<<endl;
+    }
+    return 0;
   }
