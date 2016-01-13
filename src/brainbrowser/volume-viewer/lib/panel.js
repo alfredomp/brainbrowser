@@ -507,12 +507,12 @@
         }
         
         var header_axis = panel.volume.header[panel.axis];
-        var translate_x = panel.image_translate.x - (header_axis.width_space.start + Math.abs(header_axis.width_space.space_length*header_axis.width_space.step/2))*panel.zoom;
-        var translate_y = panel.image_translate.y - (header_axis.height_space.start + Math.abs(header_axis.height_space.space_length*header_axis.height_space.step/2))*panel.zoom;
+        var translate_x = panel.image_translate.x + (header_axis.width_space.start + Math.abs(header_axis.width_space.space_length*header_axis.width_space.step/2))*panel.zoom;
+        var translate_y = panel.image_translate.y + (header_axis.height_space.start + Math.abs(header_axis.height_space.space_length*header_axis.height_space.step/2))*panel.zoom;
         var canvas_layer;
         var ctx;
 
-        panel.transformation_matrix = [panel.zoom, 0, 0, panel.zoom, translate_x, translate_y];
+        panel.transformation_matrix = [-panel.zoom, 0, 0, -panel.zoom, translate_x, translate_y];
         
         var params = {
           tm: panel.transformation_matrix,
