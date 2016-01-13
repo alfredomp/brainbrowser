@@ -27,13 +27,12 @@
 
 (function() {
   "use strict";
-     
+
   var VolumeViewer = BrainBrowser.VolumeViewer;
-  var image_creation_context = document.createElement("canvas").getContext("2d");
 
   VolumeViewer.volume_loaders.minc = function(description, callback) {
     var error_message;
-    
+
     if (description.header_url && description.raw_data_url) {
       BrainBrowser.loader.loadFromURL(description.header_url, function(header_text) {
         parseHeader(header_text, function(header) {
@@ -58,46 +57,30 @@
       BrainBrowser.events.triggerEvent("error", { message: error_message });
       throw new Error(error_message);
     }
-    
+
   };
 
-  function createMincVolume(header, raw_data, callback){
-    // var cached_slices = {};
-    var arrayraw = null;
+  /*
+   * Create a volume object given a header and some byte data that
+   * represents the voxels. Format-specific functions have to be
+   * used to create the header and byte_data, but this function
+   * combines the information into the generic data structure used
+   * elsewhere in the volume viewer.
+   */
+  VolumeViewer.createVolume = function(header, native_data) {
+    var image_creation_context = document.createElement("canvas").getContext("2d");
+    var cached_slices = {};
 
-    if(header.type === 'CHAR'){
-      arrayraw = new Uint8Array(raw_data);
-    }else if(header.type === 'SHORT'){
-      arrayraw = new Int16Array(raw_data);
-    }else if(header.type === 'USHORT'){
-      arrayraw = new Uint16Array(raw_data);
-    }else if(header.type === 'LONG'){
-      arrayraw = new Int32Array(raw_data);
-    }else if(header.type === 'ULONG'){
-      arrayraw = new Uint32Array(raw_data);
-    }else if(header.type === 'FLOAT' || header.type === 'DOUBLE'){
-      arrayraw = new Float64Array(raw_data);
-    }else{
-      arrayraw = new Uint8Array(raw_data);
-    }
+    // Populate the header with the universal fields.
+    finishHeader(header);
 
-
-    var intensitymin = Number.MAX_VALUE;
-    var intensitymax = -Number.MAX_VALUE;
-
-    for(var i = 0; i < arrayraw.length; i++){
-      intensitymin = Math.min(arrayraw[i], intensitymin);
-      intensitymax = Math.max(arrayraw[i], intensitymax);
-    }
-    
     var volume = {
       position: {},
-      position_continuous: {},
       current_time: 0,
-      data: arrayraw,
+      data: native_data,
       header: header,
-      intensity_min: intensitymin,
-      intensity_max: intensitymax,
+      intensity_min: 0,
+      intensity_max: 255,
       slice: function(axis, slice_num, time) {
         slice_num = slice_num === undefined ? volume.position[axis] : slice_num;
         time = time === undefined ? volume.current_time : time;
@@ -109,13 +92,13 @@
         }
 
         time = time || 0;
-        
-        // cached_slices[axis] = cached_slices[axis] || [];
-        // cached_slices[axis][time] =  cached_slices[axis][time] || [];
-        
-        // if(cached_slices[axis][time][slice_num] !== undefined) {
-        //   return cached_slices[axis][time][slice_num];
-        // }
+
+        cached_slices[axis] = cached_slices[axis] || [];
+        cached_slices[axis][time] =  cached_slices[axis][time] || [];
+
+        if(cached_slices[axis][time][slice_num] !== undefined) {
+          return cached_slices[axis][time][slice_num];
+        }
 
         var time_offset = header.time ? time * header.time.offset : 0;
 
@@ -130,23 +113,10 @@
         var width_space_offset = width_space.offset;
         var height_space_offset = height_space.offset;
 
-        var slice_data = null;
-
-        if(header.type === 'CHAR'){
-          slice_data = new Uint8Array(width * height);
-        }else if(header.type === 'SHORT'){
-          slice_data = new Int16Array(width * height);
-        }else if(header.type === 'USHORT'){
-          slice_data = new Uint16Array(width * height);
-        }else if(header.type === 'LONG'){
-          slice_data = new Int32Array(width * height);
-        }else if(header.type === 'ULONG'){
-          slice_data = new Uint32Array(width * height);
-        }else if(header.type === 'FLOAT' || header.type === 'DOUBLE'){
-          slice_data = new Float64Array(width * height);
-        }else{
-          slice_data = new Uint8Array(width * height);
-        }
+        // Calling the volume data's constructor guarantees that the
+        // slice data buffer has the same type as the volume.
+        //
+        var slice_data = new volume.data.constructor(width * height);
 
         var slice;
 
@@ -158,7 +128,7 @@
         var x, y, z;
 
         // Linear offsets into volume considering an
-        // increasing number of axes: (t) time, 
+        // increasing number of axes: (t) time,
         // (z) z-axis, (y) y-axis, (x) x-axis.
         var tz_offset, tzy_offset, tzyx_offset;
 
@@ -171,17 +141,19 @@
         var i = 0;
 
         z = z_positive ? slice_num : axis_space.space_length - slice_num - 1;
-        tz_offset = time_offset + z * axis_space_offset;
+        if (z >= 0 && z < axis_space.space_length) {
+          tz_offset = time_offset + z * axis_space_offset;
 
-        for (row = height - 1; row >= 0; row--) {
-          y = y_positive ? row : height - row - 1;
-          tzy_offset = tz_offset + y * height_space_offset;
+          for (row = height - 1; row >= 0; row--) {
+            y = y_positive ? row : height - row - 1;
+            tzy_offset = tz_offset + y * height_space_offset;
 
-          for (col = 0; col < width; col++) {
-            x = x_positive ? col : width - col - 1;
-            tzyx_offset = tzy_offset + x * width_space_offset;
+            for (col = 0; col < width; col++) {
+              x = x_positive ? col : width - col - 1;
+              tzyx_offset = tzy_offset + x * width_space_offset;
 
-            slice_data[i++] = volume.data[tzyx_offset];
+              slice_data[i++] = volume.data[tzyx_offset];
+            }
           }
         }
 
@@ -194,9 +166,46 @@
           height: height
         };
 
-        // cached_slices[axis][time][slice_num] = slice;
-        
+        cached_slices[axis][time][slice_num] = slice;
+
         return slice;
+      },
+
+      // Calculate the world to voxel transform and save it, so we
+      // can access it efficiently. The transform is:
+      // cxx / stepx | cxy / stepx | cxz / stepx | (-o.x * cxx - o.y * cxy - o.z * cxz) / stepx
+      // cyx / stepy | cyy / stepy | cyz / stepy | (-o.x * cyx - o.y * cyy - o.z * cyz) / stepy
+      // czx / stepz | czy / stepz | czz / stepz | (-o.x * czx - o.y * czy - o.z * czz) / stepz
+      // 0           | 0           | 0           | 1
+
+      // Origin equation taken from (http://www.bic.mni.mcgill.ca/software/minc/minc2_format/node4.html)
+
+      saveOriginAndTransform: function(header) {
+        var startx = header.xspace.start;
+        var starty = header.yspace.start;
+        var startz = header.zspace.start;
+        var cx = header.xspace.direction_cosines;
+        var cy = header.yspace.direction_cosines;
+        var cz = header.zspace.direction_cosines;
+        var stepx = header.xspace.step;
+        var stepy = header.yspace.step;
+        var stepz = header.zspace.step;
+        header.voxel_origin = {
+          x: startx * cx[0] + starty * cy[0] + startz * cz[0],
+          y: startx * cx[1] + starty * cy[1] + startz * cz[1],
+          z: startx * cx[2] + starty * cy[2] + startz * cz[2]
+        };
+        var o = header.voxel_origin;
+
+        var tx = (-o.x * cx[0] - o.y * cx[1] - o.z * cx[2]) / stepx;
+        var ty = (-o.x * cy[0] - o.y * cy[1] - o.z * cy[2]) / stepy;
+        var tz = (-o.x * cz[0] - o.y * cz[1] - o.z * cz[2]) / stepz;
+
+        header.w2v = [
+          [cx[0] / stepx, cx[1] / stepx, cx[2] / stepx, tx],
+          [cy[0] / stepy, cy[1] / stepy, cy[2] / stepy, ty],
+          [cz[0] / stepz, cz[1] / stepz, cz[2] / stepz, tz]
+        ];
       },
 
       getSliceImage: function(slice, zoom, contrast, brightness) {
@@ -207,7 +216,7 @@
 
         if (!color_map) {
           error_message = "No color map set for this volume. Cannot render slice.";
-          volume.triggerEvent("error", { message: error_message } );
+          volume.triggerEvent("error", error_message);
           throw new Error(error_message);
         }
 
@@ -240,33 +249,27 @@
         return target_image;
       },
 
-      getIntensityValue: function(x, y, z, time) {
-        x = x === undefined ? volume.position.xspace : x;
-        y = y === undefined ? volume.position.yspace : y;
-        z = z === undefined ? volume.position.zspace : z;
+      getIntensityValue: function(i, j, k, time) {
+        var header = volume.header;
+        var vc = volume.getVoxelCoords();
+        i = i === undefined ? vc.i : i;
+        j = j === undefined ? vc.j : j;
+        k = k === undefined ? vc.k : k;
         time = time === undefined ? volume.current_time : time;
 
-        if (x < 0 || x > volume.header.xspace.space_length ||
-            y < 0 || y > volume.header.yspace.space_length ||
-            z < 0 || z > volume.header.zspace.space_length) {
+        if (i < 0 || i >= header[header.order[0]].space_length ||
+            j < 0 || j >= header[header.order[1]].space_length ||
+            k < 0 || k >= header[header.order[2]].space_length) {
           return 0;
         }
-
-        var slice = volume.slice("zspace", z, time);
-
-        return slice.data[(slice.height_space.space_length - y - 1) * slice.width + x];
+        var time_offset = header.time ? time * header.time.offset : 0;
+        var xyzt_offset = (i * header[header.order[0]].offset +
+                           j * header[header.order[1]].offset +
+                           k * header[header.order[2]].offset +
+                           time_offset);
+        return volume.data[xyzt_offset];
       },
 
-      setIntensityValue : function(xyz, value){
-
-        var movsize = [ header[header.order[2]].space_length, header[header.order[1]].space_length ];
-
-        var index =  xyz[2] + (xyz[1])*movsize[0] + (xyz[0])*movsize[0]*movsize[1];
-        
-        volume.data[index] = value;
-
-      },
-      
       getVoxelCoords: function() {
         var header = volume.header;
         var position = {
@@ -281,24 +284,24 @@
           k: position[header.order[2]],
         };
       },
-      
+
       setVoxelCoords: function(i, j, k) {
         var header = volume.header;
         var ispace = header.order[0];
         var jspace = header.order[1];
         var kspace = header.order[2];
-        
+
         volume.position[ispace] = header[ispace].step > 0 ? i : header[ispace].space_length - i;
         volume.position[jspace] = header[jspace].step > 0 ? j : header[jspace].space_length - j;
         volume.position[kspace] = header[kspace].step > 0 ? k : header[kspace].space_length - k;
       },
-      
+
       getWorldCoords: function() {
         var voxel = volume.getVoxelCoords();
 
         return volume.voxelToWorld(voxel.i, voxel.j, voxel.k);
       },
-      
+
       setWorldCoords: function(x, y, z) {
         var voxel = volume.worldToVoxel(x, y, z);
 
@@ -340,100 +343,109 @@
         };
       },
 
-      // World to voxel matrix applied here is:
-      // cxx / stepx | cxy / stepx | cxz / stepx | (-o.x * cxx - o.y * cxy - o.z * cxz) / stepx
-      // cyx / stepy | cyy / stepy | cyz / stepy | (-o.x * cyx - o.y * cyy - o.z * cyz) / stepy
-      // czx / stepz | czy / stepz | czz / stepz | (-o.x * czx - o.y * czy - o.z * czz) / stepz
-      // 0           | 0           | 0           | 1
-      //
       // Inverse of the voxel to world matrix.
       worldToVoxel: function(x, y, z) {
-        var header = volume.header;
-        var cx = header.xspace.direction_cosines;
-        var cy = header.yspace.direction_cosines;
-        var cz = header.zspace.direction_cosines;
-        var stepx = header.xspace.step;
-        var stepy = header.yspace.step;
-        var stepz = header.zspace.step;
-        var o = header.voxel_origin;
-        var tx = (-o.x * cx[0] - o.y * cx[1] - o.z * cx[2]) / stepx;
-        var ty = (-o.x * cy[0] - o.y * cy[1] - o.z * cy[2]) / stepy;
-        var tz = (-o.x * cz[0] - o.y * cz[1] - o.z * cz[2]) / stepz;
-
+        var xfm = header.w2v;   // Get the world-to-voxel transform.
         var result = {
-          x: x * cx[0] / stepx + y * cx[1] / stepx + z * cx[2] / stepx + tx,
-          y: x * cy[0] / stepy + y * cy[1] / stepy + z * cy[2] / stepy + ty,
-          z: x * cz[0] / stepz + y * cz[1] / stepz + z * cz[2] / stepz + tz
+          vx: x * xfm[0][0] + y * xfm[0][1] + z * xfm[0][2] + xfm[0][3],
+          vy: x * xfm[1][0] + y * xfm[1][1] + z * xfm[1][2] + xfm[1][3],
+          vz: x * xfm[2][0] + y * xfm[2][1] + z * xfm[2][2] + xfm[2][3]
         };
 
         var ordered = {};
-        ordered[header.order[0]] = result.x;
-        ordered[header.order[1]] = result.y;
-        ordered[header.order[2]] = result.z;
+        ordered[header.order[0]] = Math.round(result.vx);
+        ordered[header.order[1]] = Math.round(result.vy);
+        ordered[header.order[2]] = Math.round(result.vz);
 
         return {
           i: ordered.xspace,
           j: ordered.yspace,
           k: ordered.zspace
         };
+      },
+      getVoxelMin: function() {
+        return volume.header.voxel_min;
+      },
+      getVoxelMax: function() {
+        return volume.header.voxel_max;
       }
     };
-    
+    return volume;
+  };
+
+  VolumeViewer.utils.scanDataRange = function(native_data, header) {
+    var d = 0;
+    var n_min = +Infinity;
+    var n_max = -Infinity;
+
+    for (d = 0; d < native_data.length; d++) {
+      var value = native_data[d];
+      if (value > n_max)
+        n_max = value;
+      if (value < n_min)
+        n_min = value;
+    }
+    header.voxel_min = n_min;
+    header.voxel_max = n_max;
+  };
+
+  function createMincData(header, raw_data){
+    var native_data = null;
+    switch (header.datatype) {
+    case 'int8':
+      native_data = new Int8Array(raw_data);
+      break;
+    case 'int16':
+      native_data = new Int16Array(raw_data);
+      break;
+    case 'int32':
+      native_data = new Int32Array(raw_data);
+      break;
+    case 'float32':
+      native_data = new Float32Array(raw_data);
+      break;
+    case 'float64':
+      native_data = new Float64Array(raw_data);
+      break;
+    case 'uint8':
+      native_data = new Uint8Array(raw_data);
+      break;
+    case 'uint16':
+      native_data = new Uint16Array(raw_data);
+      break;
+    case 'uint32':
+      native_data = new Uint32Array(raw_data);
+      break;
+    default:
+      var error_message = "Unsupported data type: " + header.datatype;
+      BrainBrowser.events.triggerEvent("error", { message: error_message } );
+      throw new Error(error_message);
+    }
+
+    VolumeViewer.utils.scanDataRange(native_data, header);
+    return native_data;
+  }
+
+  function createMincVolume(header, raw_data, callback){
+    var volume = VolumeViewer.createVolume(header,
+                                           createMincData(header, raw_data));
+    volume.type = "minc";
+
+    volume.saveOriginAndTransform(header);
+    volume.intensity_min = header.voxel_min;
+    volume.intensity_max = header.voxel_max;
     if (BrainBrowser.utils.isFunction(callback)) {
       callback(volume);
     }
   }
 
-  function parseHeader(header_text, callback) {
-    var header;
-    var error_message;
-    var startx, starty, startz, cx, cy, cz;
-
-    try{
-      header = JSON.parse(header_text);
-    } catch(error) {
-      error_message = "server did not respond with valid JSON" + "\n" +
-        "Response was: \n" + header_text;
-
-      BrainBrowser.events.triggerEvent("error", { message: error_message });
-      throw new Error(error_message);
-    }
-
-    
-    if(header.order.length === 4) {
-      header.order = header.order.slice(1);
-    }
-
+  /*
+   * Creates common fields all headers must contain.
+   */
+  function finishHeader(header) {
     header.xspace.name = "xspace";
     header.yspace.name = "yspace";
     header.zspace.name = "zspace";
-    
-    header.xspace.space_length = parseFloat(header.xspace.space_length);
-    header.yspace.space_length = parseFloat(header.yspace.space_length);
-    header.zspace.space_length = parseFloat(header.zspace.space_length);
-
-    startx = header.xspace.start = parseFloat(header.xspace.start);
-    starty = header.yspace.start = parseFloat(header.yspace.start);
-    startz = header.zspace.start = parseFloat(header.zspace.start);
-
-    header.xspace.step = parseFloat(header.xspace.step);
-    header.yspace.step = parseFloat(header.yspace.step);
-    header.zspace.step = parseFloat(header.zspace.step);
-
-    header.xspace.direction_cosines = header.xspace.direction_cosines || [1, 0, 0];
-    header.yspace.direction_cosines = header.yspace.direction_cosines || [0, 1, 0];
-    header.zspace.direction_cosines = header.zspace.direction_cosines || [0, 0, 1];
-
-    cx = header.xspace.direction_cosines = header.xspace.direction_cosines.map(parseFloat);
-    cy = header.yspace.direction_cosines = header.yspace.direction_cosines.map(parseFloat);
-    cz = header.zspace.direction_cosines = header.zspace.direction_cosines.map(parseFloat);
-
-    // Origin equation taken from (http://www.bic.mni.mcgill.ca/software/minc/minc2_format/node4.html)
-    header.voxel_origin = {
-      x: startx * cx[0] + starty * cy[0] + startz * cz[0],
-      y: startx * cx[1] + starty * cy[1] + startz * cz[1],
-      z: startx * cx[2] + starty * cy[2] + startz * cz[2]
-    };
 
     header.xspace.width_space  = header.yspace;
     header.xspace.width        = header.yspace.space_length;
@@ -450,7 +462,56 @@
     header.zspace.height_space = header.yspace;
     header.zspace.height       = header.yspace.space_length;
 
-    // Incrementation offsets for each dimension of the volume.
+    if (header.voxel_min === undefined)
+      header.voxel_min = 0;
+    if (header.voxel_max === undefined)
+      header.voxel_max = 255;
+  }
+
+  function parseHeader(header_text, callback) {
+    var header;
+    var error_message;
+
+    try{
+      header = JSON.parse(header_text);
+    } catch(error) {
+      error_message = "server did not respond with valid JSON" + "\n" +
+        "Response was: \n" + header_text;
+
+      BrainBrowser.events.triggerEvent("error", { message: error_message });
+      throw new Error(error_message);
+    }
+
+    if(header.order.length === 4) {
+      header.order = header.order.slice(1);
+    }
+
+    header.datatype = header.datatype || "uint8";
+
+    header.xspace.space_length = parseFloat(header.xspace.space_length);
+    header.yspace.space_length = parseFloat(header.yspace.space_length);
+    header.zspace.space_length = parseFloat(header.zspace.space_length);
+
+    header.xspace.start = parseFloat(header.xspace.start);
+    header.yspace.start = parseFloat(header.yspace.start);
+    header.zspace.start = parseFloat(header.zspace.start);
+
+    header.xspace.step = parseFloat(header.xspace.step);
+    header.yspace.step = parseFloat(header.yspace.step);
+    header.zspace.step = parseFloat(header.zspace.step);
+
+    header.xspace.direction_cosines = header.xspace.direction_cosines || [1, 0, 0];
+    header.yspace.direction_cosines = header.yspace.direction_cosines || [0, 1, 0];
+    header.zspace.direction_cosines = header.zspace.direction_cosines || [0, 0, 1];
+
+    header.xspace.direction_cosines = header.xspace.direction_cosines.map(parseFloat);
+    header.yspace.direction_cosines = header.yspace.direction_cosines.map(parseFloat);
+    header.zspace.direction_cosines = header.zspace.direction_cosines.map(parseFloat);
+
+    /* Incrementation offsets for each dimension of the volume.
+     * Note that this somewhat format-specific, so it does not 
+     * belong in the generic "createVolume()" code.
+     */
     header[header.order[0]].offset = header[header.order[1]].space_length * header[header.order[2]].space_length;
     header[header.order[1]].offset = header[header.order[2]].space_length;
     header[header.order[2]].offset = 1;
@@ -467,5 +528,5 @@
     }
 
   }
-   
+
 }());
