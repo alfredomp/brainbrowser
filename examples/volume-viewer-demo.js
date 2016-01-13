@@ -98,16 +98,16 @@ $(function() {
         viewer.loadVolumes({
           volumes: [
             {
-              type: "nifti1",
-              nii_url: "models/functional.nii",
+              type: "itkReader",
+              url: "models/T1.nii",
               template: {
                 element_id: "volume-ui-template",
                 viewer_insert_class: "volume-viewer-display"
               }
             },
             {
-              type: 'nifti1',
-              nii_url: "models/structural.nii",
+              type: 'itkReader',
+              url: "models/T1_aseg_crop.nii",
               template: {
                 element_id: "volume-ui-template",
                 viewer_insert_class: "volume-viewer-display"
