@@ -121,7 +121,7 @@ module.exports = function(grunt) {
             THREE: true,
             BrainBrowser: true,
             alert: true,
-            console: true,            
+            console: true,
             Module: true,
             FS: true
           }
