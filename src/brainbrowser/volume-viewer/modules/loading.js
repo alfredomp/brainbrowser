@@ -602,7 +602,7 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
 
       canvas_layers.push(canvas_layer_cursor);
 
-      for(var i = 0; i < canvas_layers.length; i++){
+      for(i = 0; i < canvas_layers.length; i++){
         div.appendChild(canvas_layers[i].canvas);
       }
 
