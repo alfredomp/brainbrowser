@@ -68,7 +68,12 @@
         itkJS.ReadImage();
 
         createHeader(itkJS, function(header){
-          createVolume(itkJS, header, callback);
+          createVolume(itkJS, header, function(){
+            
+            if(callback){
+              callback();
+            }
+          });
         });
 
       }, { result_type: "arraybuffer" });
@@ -173,38 +178,18 @@
         var slice_data = volume.slice_data[axis];
 
         var slice;
-
-        // Rows and colums of the result slice.
-        var row, col;
-
-        // Indexes into the volume, relative to the slice.
-        // NOT xspace, yspace, zspace coordinates!!!
-        var x, y, z;
-
         // Linear offsets into volume considering an
         // increasing number of axes: (t) time, 
         // (z) z-axis, (y) y-axis, (x) x-axis.
         var tz_offset, tzy_offset, tzyx_offset;
 
-        // Whether the dimension steps positively or negatively.
-        var x_positive = width_space.step  > 0;
-        var y_positive = height_space.step > 0;
-        var z_positive = axis_space.step   > 0;
-
         // iterator for the result slice.
         var i = 0;
-
-        z = z_positive ? slice_num : axis_space.space_length - slice_num - 1;
-        tz_offset = time_offset + z * axis_space_offset;
-
-        for (row = height - 1; row >= 0; row--) {
-          y = y_positive ? row : height - row - 1;
-          tzy_offset = tz_offset + y * height_space_offset;
-
-          for (col = 0; col < width; col++) {
-            x = x_positive ? col : width - col - 1;
-            tzyx_offset = tzy_offset + x * width_space_offset;
-
+        
+        tz_offset = time_offset + slice_num * axis_space_offset;
+        
+        for (tzy_offset = tz_offset + (height - 1)*height_space_offset; tzy_offset >= tz_offset; tzy_offset-=height_space_offset) {
+          for (tzyx_offset = tzy_offset; tzyx_offset < tzy_offset + width * width_space_offset; tzyx_offset+=width_space_offset) {
             slice_data[i++] = volume.data[tzyx_offset];
           }
         }
@@ -279,16 +264,7 @@
         y = y === undefined ? volume.position.yspace : y;
         z = z === undefined ? volume.position.zspace : z;
         time = time === undefined ? volume.current_time : time;
-
-        if (x < 0 || x > volume.header.xspace.space_length ||
-            y < 0 || y > volume.header.yspace.space_length ||
-            z < 0 || z > volume.header.zspace.space_length) {
-          return 0;
-        }
-
-        var slice = volume.slice("zspace", z, time);
-
-        return slice.data[(slice.height_space.space_length - y - 1) * slice.width + x];
+        return volume.getVolumeDataIntensityValue(x, y, z);
       },
 
       getVolumeDataIntensityValue: function(x, y, z){
@@ -507,7 +483,7 @@
     header[header.order[1]].offset = header[header.order[2]].space_length;
     header[header.order[2]].offset = 1;
 
-    return native_data;
+    return new native_data.constructor(native_data);
   }
    
 }());

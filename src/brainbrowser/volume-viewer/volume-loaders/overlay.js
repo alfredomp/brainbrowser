@@ -49,7 +49,7 @@
       volumes: [],
       blend_ratios: [],
       mask_overlay : false,
-
+      image_data : {},
       slice: function(axis, slice_num, time) {
         slice_num = slice_num === undefined ? this.position[axis] : slice_num;
         time = time === undefined ? this.current_time : time;
@@ -122,35 +122,12 @@
         time = time === undefined ? this.current_time : time;
 
         var overlay_volume = this;
-        var values = [];
-
-        overlay_volume.volumes.forEach(function(volume) {
-          var header = volume.header;
-
-          if (x < 0 || x > header.xspace.space_length ||
-            y < 0 || y > header.yspace.space_length ||
-            z < 0 || z > header.zspace.space_length) {
-            values.push(0);
-          }
-
-          var slice = volume.slice("zspace", z, time);
-          var data = slice.data;
-          var slice_x, slice_y;
-
-          if (slice.width_space.name === "xspace") {
-            slice_x = x;
-            slice_y = y;
-          } else {
-            slice_x = y;
-            slice_y = z;
-          }
-
-          values.push(data[(slice.height_space.space_length - slice_y - 1) * slice.width + slice_x]);
+        var intensity = 0;
+        overlay_volume.volumes.forEach(function(volume, i) {
+          intensity += volume.getIntensityValue(x, y, z, time) * overlay_volume.blend_ratios[i];
         });
 
-        return values.reduce(function(intensity, current_value, i) {
-          return intensity + current_value * overlay_volume.blend_ratios[i];
-        }, 0);
+        return intensity;
       },
 
       setMaskOverlay : function(mask){

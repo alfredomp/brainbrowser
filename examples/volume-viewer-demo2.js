@@ -783,6 +783,35 @@ $(function() {
                     }
                   }
                 }
+
+                var prevVoxelCoords = undefined;
+
+                var correctLine = function(point, ppoint, label, offsets){
+                  var delta = {
+                    i: ppoint.i - point.i,
+                    j: ppoint.j - point.j,
+                    k: ppoint.k - point.k
+                  }
+                  var dist = Math.sqrt(Math.pow(delta.i, 2) + Math.pow(delta.j, 2) + Math.pow(delta.k, 2));
+                  if(dist > 1){
+                    var inc = 1/(Math.abs(delta.i) + Math.abs(delta.j) + Math.abs(delta.k));
+                    for(var t = 0; t <= 1; t+=inc){
+                      var newpoint = {
+                        i: Math.round(point.i + delta.i * t),
+                        j: Math.round(point.j + delta.j * t),
+                        k: Math.round(point.k + delta.k * t)
+                      }
+                      var x = newpoint.i;
+                      var y = newpoint.j;
+                      var z = newpoint.k;
+
+                      for(var i = 0; i < offsets.length; i++){
+                        var off = offsets[i];
+                        viewer.volumes[1].setIntensityValue(x + off[0], y  + off[1], z  + off[2], label);
+                      }
+                    }
+                  }
+                }
                 
                 var drawPixel = function(){
                   var point = panel.getVoxelCoordinates();
@@ -797,8 +826,14 @@ $(function() {
                       var off = offset[i];
                       viewer.volumes[1].setIntensityValue(x + off[0], y  + off[1], z  + off[2], label);
                     }
-                    
-                    viewer.redrawVolumes();
+
+                    panel.updateSlice();
+
+                    if(prevVoxelCoords){
+                      correctLine(point, prevVoxelCoords, label, offset);
+                    }
+
+                    prevVoxelCoords = point;
                     
                   }
                 };

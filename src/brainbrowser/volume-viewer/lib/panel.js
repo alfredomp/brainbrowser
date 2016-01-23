@@ -449,10 +449,10 @@
 
           setSlice(panel, slice);
 
-          panel.triggerEvent("sliceupdate", {
-            volume: volume,
-            slice: slice
-          });
+          // panel.triggerEvent("sliceupdate", {
+          //   volume: volume,
+          //   slice: slice
+          // });
 
           panel.updated = true;
 
@@ -483,19 +483,19 @@
           old_cursor_position.x = cursor.x;
           old_cursor_position.y = cursor.y;
           panel.updated = true;
-          panel.triggerEvent("cursorupdate", {
-            volume: panel.volume,
-            cursor: cursor
-          });
+          // panel.triggerEvent("cursorupdate", {
+          //   volume: panel.volume,
+          //   cursor: cursor
+          // });
         }
 
         if (old_zoom_level !== panel.zoom) {
           old_zoom_level = panel.zoom;
           panel.updated = true;
-          panel.triggerEvent("zoom", {
-            volume: panel.volume,
-            zoom: panel.zoom
-          });
+          // panel.triggerEvent("zoom", {
+          //   volume: panel.volume,
+          //   zoom: panel.zoom
+          // });
         }
 
         if (panel.touches[0]) {
@@ -561,12 +561,12 @@
           }
         }
         
-        panel.triggerEvent("draw", {
-          volume: panel.volume,
-          cursor: cursor,
-          canvas: canvas,
-          context: context
-        });
+        // panel.triggerEvent("draw", {
+        //   volume: panel.volume,
+        //   cursor: cursor,
+        //   canvas: canvas,
+        //   context: context
+        // });
         
         //drawCursor(panel, cursor_color);
 
