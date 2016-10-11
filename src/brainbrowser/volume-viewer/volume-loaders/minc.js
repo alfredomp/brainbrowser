@@ -298,8 +298,7 @@
 
       getWorldCoords: function() {
         var voxel = volume.getVoxelCoords();
-
-        return volume.voxelToWorld(voxel.i, voxel.j, voxel.k);
+        return volume.voxelToWorld(voxel.xspace, voxel.yspace, voxel.zspace);
       },
 
       setWorldCoords: function(x, y, z) {

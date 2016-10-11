@@ -223,6 +223,8 @@
           }
         }
 
+        panel.canvas = panel.canvas_layers[panel.canvas_layers.length - 1].canvas;
+
         if(options.scale_image){
           panel.image_translate.x = panel.canvas.width/2;
           panel.image_translate.y = panel.canvas.height/2;
@@ -253,8 +255,6 @@
       followPointer: function(pointer) {
         var dx = pointer.x - old_pointer_position.x;
         var dy = pointer.y - old_pointer_position.y;
-
-        panel.translateImage(dx, dy);
 
         old_pointer_position.x = pointer.x;
         old_pointer_position.y = pointer.y;
@@ -325,7 +325,7 @@
 
         return {
           x: (x_position) * Math.abs(slice.width_space.step) + origin.x,
-          y: (slice.height_space.space_length - y_position) * Math.abs(slice.height_space.step) + origin.y
+          y: (y_position) * Math.abs(slice.height_space.step) + origin.y
         };
       },
 
@@ -372,6 +372,7 @@
       * ```
       */
       getVolumePosition: function(x, y) {
+
         var origin = getDrawingOrigin(panel);
         var slice = panel.slice;
         var cursor;
@@ -390,8 +391,8 @@
         step_slice_x = Math.abs(slice.width_space.step);
         step_slice_y = Math.abs(slice.height_space.step);
 
-        slice_x = Math.floor((x - origin.x) / step_slice_x);
-        slice_y = Math.floor(slice.height_space.space_length - (y - origin.y) / step_slice_y);
+        slice_x = (x - origin.x) / step_slice_x;
+        slice_y = (y - origin.y) / step_slice_y;
 
         if(slice_x < 0 || slice_x > slice.width_space.space_length || slice_y < 0 || slice_y > slice.height_space.space_length){
           return null;
@@ -439,11 +440,7 @@
 
         update_timeout = setTimeout(function() {
           var volume = panel.volume;
-          var slice;
-          
-          slice = volume.slice(panel.axis);
-
-          setSlice(panel, slice);
+          var slice = panel.slice;
 
           panel.triggerEvent("sliceupdate", {
             volume: volume,
@@ -537,9 +534,9 @@
           canvas_layer.draw(canvas_layer.canvas_buffer, ctx, params);
         }
         
-        
         canvas_layer = panel.canvas_layers[0];
         ctx = canvas_layer.canvas.getContext("2d");
+
         panel.triggerEvent("draw", {
           volume: panel.volume,
           cursor: cursor,
@@ -574,38 +571,48 @@
       drawVolumeSlice: function(volume_id, buffer, ctx, params){
 
         var volume = panel.volume;
-        if(panel.volume.volumes){
-          volume = panel.volume.volumes[volume_id];
+        panel.slice = volume.slice(panel.axis);
+        ctx.setTransform(params.tm[0], params.tm[1], params.tm[2], params.tm[3], params.tm[4], params.tm[5]);
+        
+        var slice;
+        var image;
+        
+        if(volume.volumes){
+          slice = panel.slice.slice(volume_id, panel.axis);
+          image = volume.getSliceImage(volume_id, slice, panel.contrast, panel.brightness);
+          ctx.globalAlpha = volume.blend_ratios[volume_id];
+        }else{
+          slice = panel.slice;
+          image = volume.getSliceImage(slice, panel.zoom, panel.contrast, panel.brightness);
         }
-        var slice = volume.slice(panel.axis);
-        var image = volume.getSliceImage(slice, panel.zoom, panel.contrast, panel.brightness);
-        var image_width = slice.width_space.space_length*slice.width_space.step;
-        var image_height = slice.height_space.space_length*slice.height_space.step;
-        var ctx_buffer = buffer.getContext("2d");
-
+        
         if (image) {
+          var image_width = slice.width_space.space_length*slice.width_space.step;
+          var image_height = slice.height_space.space_length*slice.height_space.step;
+          var ctx_buffer = buffer.getContext("2d");
           var origin = {};
-          origin.x = volume.header[panel.axis].width_space.start;
-          origin.y = volume.header[panel.axis].height_space.start;
+          origin.x = slice.width_space.start;
+          origin.y = slice.height_space.start;
           ctx_buffer.putImageData(image, 0, 0);
-          ctx.setTransform(params.tm[0], params.tm[1], params.tm[2], params.tm[3], params.tm[4], params.tm[5]);
+          ctx.imageSmoothingEnabled = panel.smooth_image;
           ctx.drawImage(buffer, origin.x, origin.y, image_width, image_height );
         }
       },
 
-      drawMousePointer : function(cursor_color){
+      drawMousePointer : function(cursor_color, coords){
         var canvas = panel.canvas_layers[panel.canvas_layers.length - 1].canvas;
         var ctx = canvas.getContext("2d");
 
         var params = {
           tm: panel.transformation_matrix,
-          cursor_color: cursor_color
+          cursor_color: cursor_color,
+          cursor_coords: coords
         };
 
-        ctx.imageSmoothingEnabled = panel.smooth_image;
+        ctx.imageSmoothingEnabled = false;
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, canvas.canvas.width, canvas.canvas.height);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.restore();
 
         panel.drawCursorLayer(undefined, ctx, params);
@@ -632,7 +639,7 @@
           ctx.restore();
         }
 
-        drawCursor(panel, params.cursor_color, undefined, ctx);
+        drawCursor(panel, params.cursor_color, params.cursor_coords, ctx);
       }
 
     };
@@ -644,8 +651,7 @@
     });
 
     if (panel.volume) {
-      var slice_num = panel.volume.header[panel.axis].space_length/2 | 0;
-      setSlice(panel, panel.volume.slice(panel.axis, slice_num));
+      setSlice(panel, panel.volume.slice(panel.axis));
     }
 
     return panel;
@@ -658,7 +664,6 @@
   // Set the volume slice to be rendered on the panel.
   function setSlice(panel, slice) {
     panel.slice = slice;
-    panel.slice_image = panel.volume.getSliceImage(panel.slice, panel.zoom, panel.contrast, panel.brightness);
   }
 
   // Draw the cursor at its current position on the canvas.
@@ -698,7 +703,7 @@
     dy = panel.slice.height_space.step;
     
     origx = x - dx*cursor_size;
-    origy = y + dy*cursor_size;
+    origy = y - dy*cursor_size;
 
     dx += 2*dx*cursor_size;
     dy +=  2*dy*cursor_size;
@@ -706,10 +711,11 @@
 
     context.moveTo(origx, origy);
     context.lineTo(origx + dx, origy);
-    context.lineTo(origx + dx, origy - dy);
-    context.lineTo(origx, origy - dy);
+    context.lineTo(origx + dx, origy + dy);
+    context.lineTo(origx, origy + dy);
     context.lineTo(origx, origy);
     context.stroke();
+    context.globalAlpha = 0.5;
     context.closePath();
 
     if (panel.anchor) {

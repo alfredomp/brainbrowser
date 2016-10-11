@@ -107,7 +107,7 @@ $(function() {
             },
             {
               type: 'itkReader',
-              url: "models/T1_aseg_crop.nii",
+              url: "models/T1_aseg.nii",
               template: {
                 element_id: "volume-ui-template",
                 viewer_insert_class: "volume-viewer-display"
@@ -119,6 +119,77 @@ $(function() {
               element_id: "overlay-ui-template",
               viewer_insert_class: "overlay-viewer-display"
             }
+          },
+          complete: function(){
+            viewer.interaction_type = 1;
+            viewer.volumes[2].display.forEach(function(panel) {
+                  
+              var label = 255;
+              var offset = [];
+              var size = 0;
+              
+              for(var k = -size; k <= size; k++){
+                for(var j = -size; j <= size; j++){
+                  for(var i = -size; i <= size; i++){
+                    var off = [i, j, k];
+                    offset.push(off);
+                  }
+                }
+              }
+              
+              var drawPixel = function(){
+                var point = panel.getVoxelCoordinates();
+
+                if(point){
+                  
+                  var x = point.i;
+                  var y = point.j;
+                  var z = point.k;
+                  
+                  for(var i = 0; i < offset.length; i++){
+                    var off = offset[i];
+                    viewer.volumes[1].setIntensityValue(x + off[0], y  + off[1], z  + off[2], label);
+                  }
+                  
+                  viewer.redrawVolumes();
+                  
+                }
+              };
+
+              var drawMousePointer = function(x, y){
+                
+                var volpos = panel.getVolumePosition(x, y);
+                if(volpos){
+                  var cursorpos = panel.getCursorPosition(volpos.slice_x, volpos.slice_y);
+                  panel.drawMousePointer("#FFFFFF", cursorpos);
+                }
+              };
+
+              var mousedown = false;
+
+              var canvas = panel.canvas_layers[panel.canvas_layers.length - 1].canvas;
+
+              canvas.addEventListener("mousedown", function () {
+                mousedown = true;
+                drawPixel();
+              });
+
+              canvas.addEventListener("mouseup", function () {
+                mousedown = false;
+              });
+
+              canvas.addEventListener("mousemove", function (event) {
+                var element = event.target;
+                
+                if(mousedown && !(event.ctrlKey || event.shiftKey)){
+                  drawPixel();
+                }
+                else{
+                  var rect = element.getBoundingClientRect();
+                  drawMousePointer(event.x - rect.left, event.y - rect.top);
+                }
+              }, false);
+            });
           }
         });
       } else if ($(this).val() === "MGH"){
@@ -733,11 +804,24 @@ $(function() {
      * Equation is from http://www.w3.org/TR/AERT#color-contrast
      */
     function getContrastYIQ(hexcolor) {
-      var r = parseInt(hexcolor.substr(0, 2), 16);
-      var g = parseInt(hexcolor.substr(2, 2), 16);
-      var b = parseInt(hexcolor.substr(4, 2), 16);
-      var yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
-      return (yiq >= 128) ? 'black' : 'white';
+      var r;
+      var g;
+      var b;
+      var yiq;
+      if(Array.isArray(hexcolor)){
+        r = hexcolor[0];
+        g = hexcolor[1];
+        b = hexcolor[2];
+        yiq = hexcolor[3];
+        return (yiq >= 128) ? 'black' : 'white';
+      }else{
+        r = parseInt(hexcolor.substr(0, 2), 16);
+        g = parseInt(hexcolor.substr(2, 2), 16);
+        b = parseInt(hexcolor.substr(4, 2), 16);
+        yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+        return (yiq >= 128) ? 'black' : 'white';
+      }
+      
     }
 
     /////////////////////////////////////////////////////

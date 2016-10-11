@@ -1,6 +1,6 @@
 
 #include "itkImageJS.h"
-
+#include <vnl/vnl_inverse.h>
 // Binding code
 EMSCRIPTEN_BINDINGS(itk_image_j_s) {
   class_<itkImageJS>("itkImageJS")
@@ -17,10 +17,13 @@ EMSCRIPTEN_BINDINGS(itk_image_j_s) {
     .function("GetPixel", &itkImageJS::GetPixel)
     .function("GetPixelWorld", &itkImageJS::GetPixelWorld)
     .function("SetPixel", &itkImageJS::SetPixel)
+    .function("SetPixelWorld", &itkImageJS::SetPixelWorld)
     .function("GetDataType", &itkImageJS::GetDataType)
     .function("GetFilename", &itkImageJS::GetFilename)
     .function("SetFilename", &itkImageJS::SetFilename)
     .function("GetSlice", &itkImageJS::GetSlice)
+    .function("TransformPhysicalPointToIndex", &itkImageJS::TransformPhysicalPointToIndex)
+    .function("TransformIndexToPhysicalPoint", &itkImageJS::TransformIndexToPhysicalPoint)
     ;
 }
 
@@ -29,6 +32,7 @@ itkImageJS::itkImageJS(){
 }
 
 itkImageJS::~itkImageJS(){
+  m_VectorSlice.clear();
 }
 
 /*
@@ -89,7 +93,6 @@ void itkImageJS::MountDirectory(const string filename){
       orienter->SetDesiredCoordinateOrientation(itk::SpatialOrientation::ITK_COORDINATE_ORIENTATION_LPI);
       orienter->SetInput(image);
       orienter->Update();
-
       image = orienter->GetOutput();
 
       this->SetImage(image);
@@ -106,25 +109,21 @@ void itkImageJS::MountDirectory(const string filename){
   */
   void itkImageJS::Initialize(){
 
-    m_Interpolate->SetInputImage(this->GetImage());
+    InputImagePointerType img = this->GetImage();
+    m_Interpolate->SetInputImage(img);
 
-    SizeType size = this->GetImage()->GetLargestPossibleRegion().GetSize();
+    SizeType size = img->GetLargestPossibleRegion().GetSize();
     m_Size[0] = size[0];
     m_Size[1] = size[1];
     m_Size[2] = size[2];
 
-    SpacingType spacing = this->GetImage()->GetSpacing();
+    SpacingType spacing = img->GetSpacing();
     m_Spacing[0] = spacing[0];
     m_Spacing[1] = spacing[1];
     m_Spacing[2] = spacing[2];
     
-    vnl_vector<double> origin = this->GetImage()->GetOrigin().GetVnlVector()*this->GetImage()->GetDirection().GetVnlMatrix();
+    DirectionType direction = img->GetDirection();
 
-    m_Origin[0] = origin[0];
-    m_Origin[1] = origin[1];
-    m_Origin[2] = origin[2];
-
-    DirectionType direction = this->GetImage()->GetDirection();
     for(int i = 0; i < dimension*dimension; i++){
       m_Direction[i] = direction[i/dimension][i%dimension];
     }
@@ -133,13 +132,97 @@ void itkImageJS::MountDirectory(const string filename){
     m_MapStringDirection["yspace"] = 1;
     m_MapStringDirection["zspace"] = 2;
 
+    for(int projectionDirection = 0; projectionDirection < 3; projectionDirection++){
+      int directionIndex[2];
+      int n = 0;
+      for(int i = 0; i < 3; i++){
+        if(projectionDirection != i){
+          directionIndex[n] = i;
+          n++;
+        }
+      }
+    
+      ImagePointerType2D img2d = ImageType2D::New();
+      RegionType2D region;
+      SizeType2D size;
+      size[0] = m_Size[directionIndex[0]];
+      size[1] = m_Size[directionIndex[1]];
+      region.SetSize(size);
+      IndexType2D index;
+      index.Fill(0);
+      region.SetIndex(index);
+      img2d->SetRegions(region);
+      img2d->Allocate();
+      img2d->FillBuffer(0);
 
-    for(int projectionDirection = 0; projectionDirection < 3; ++projectionDirection){
-      ExtractFilterPointerType extract = ExtractFilterType::New();
-      extract->SetInput(this->GetImage());
-      extract->SetDirectionCollapseToIdentity();
-      m_VectorExtractFilter.push_back(extract);
+      m_VectorSlice.push_back(img2d);
     }
+
+
+    PointType origin = img->GetOrigin();
+
+    ImageIteratorType it(img, img->GetLargestPossibleRegion());
+    it.GoToBegin();
+
+    while(!it.IsAtEnd()){
+      PointType p;
+      img->TransformIndexToPhysicalPoint(it.GetIndex(), p);
+      origin[0] = min(p[0], origin[0]);
+      origin[1] = min(p[1], origin[1]);
+      origin[2] = min(p[2], origin[2]);
+      ++it;
+    }
+
+    m_Origin[0] = origin[0];
+    m_Origin[1] = origin[1];
+    m_Origin[2] = origin[2];
+
+    cout<<"orig"<<origin<<endl;
+
+    // m_OffsetImage = OffsetImageType::New();
+    // m_OffsetImage->SetRegions(this->GetImage()->GetLargestPossibleRegion());
+    // m_OffsetImage->Allocate();
+
+    // OffsetImageIteratorType offsetit(m_OffsetImage, m_OffsetImage->GetLargestPossibleRegion());
+    // offsetit.GoToBegin();
+
+    // PointType point;
+
+    // int i, j, k;
+    // for(point[2] = origin[2] + m_Spacing[2]*(m_Size[2]-1), k = 0; k < m_Size[2]; point[2] -= m_Spacing[2], k++){
+    //   for(point[1] = origin[1] + m_Spacing[1]*(m_Size[1]-1), j = 0; j < m_Size[1]; point[1] -= m_Spacing[1], j++){
+    //     for(point[0] = origin[0] + m_Spacing[0]*(m_Size[0]-1), i = 0; i < m_Size[0]; point[0] -= m_Spacing[0], i++){
+
+    //       IndexType index;
+    //       img->TransformPhysicalPointToIndex(point, index);
+    //       offsetit.Set(img->ComputeOffset(index));
+    //       ++offsetit;
+    //     }
+    //   }
+    // }
+    
+
+    // ImageIteratorType it(this->GetImage(), this->GetImage()->GetLargestPossibleRegion());
+    // m_OffsetImage = OffsetImageType::New();
+    // m_OffsetImage->SetRegions(this->GetImage()->GetLargestPossibleRegion());
+    // m_OffsetImage->Allocate();
+
+    // OffsetImageIteratorType offsetit(m_OffsetImage, m_OffsetImage->GetLargestPossibleRegion());
+    // offsetit.GoToBegin();
+
+    // while(!offsetit.IsAtEnd()){
+
+    //   IndexType index = offsetit.GetIndex();
+    //   PointType point;
+    //   point[0] = m_Origin[0] + index[0]*m_Spacing[0];
+    //   point[2] = m_Origin[1] + index[1]*m_Spacing[1];
+    //   point[1] = m_Origin[2] + index[2]*m_Spacing[2];
+
+    //   img->TransformPhysicalPointToIndex(point, index);
+
+    //   offsetit.Set(img->ComputeOffset(index));
+    //   ++offsetit;
+    // }
   }
 
   /*
@@ -162,26 +245,54 @@ void itkImageJS::MountDirectory(const string filename){
   /*
   * Get a slice from the image
   */
-  int itkImageJS::GetSlice(string axis, int slice_num){
+  inline int itkImageJS::GetSlice(string axis, int slice_num){
 
 
     int projectionDirection = m_MapStringDirection[axis];
 
-    ExtractFilterPointerType extract = m_VectorExtractFilter[projectionDirection];
-    RegionType region = this->GetImage()->GetLargestPossibleRegion();
-    region.SetSize(projectionDirection, 1);
-    region.SetIndex(projectionDirection, slice_num);
-
-    cout<<region<<endl;
-
-    try{
-      extract->SetExtractionRegion(region);
-      extract->Update();
-      
-      InputImagePointerType outimage = extract->GetOutput();
-      return (int)outimage->GetBufferPointer()/sizeof(PixelType);
-    }catch(itk::ExceptionObject &e){
-      cerr<<e<<endl;
+    int directionIndex[2];
+    int n = 0;
+    for(int i = 0; i < 3; i++){
+      if(projectionDirection != i){
+        directionIndex[n] = i;
+        n++;
+      }
     }
-    return 0;
+    
+    // InputImageOffsetValueType* offsetBuffer = m_OffsetImage->GetBufferPointer();
+
+    ImagePointerType2D slice = m_VectorSlice[projectionDirection];
+    ImageIterator2DType it(slice, slice->GetLargestPossibleRegion());
+    it.GoToBegin();
+    InputImagePointerType img = this->GetImage();
+    const OffsetImageOffsetValueType* offsetOffsetTable = img->GetOffsetTable();
+
+    // PointType point = img->GetOrigin();
+    // point[projectionDirection] = slice_num;
+    // IndexType index;
+    // img->TransformPhysicalPointToIndex(point, index);
+
+    int row_index = directionIndex[1];
+    int col_index = directionIndex[0];
+
+    int row_offset = offsetOffsetTable[row_index];
+    int col_offset = offsetOffsetTable[col_index];
+
+    int tz_offset = slice_num*offsetOffsetTable[projectionDirection];
+
+    int row_size = tz_offset + m_Size[row_index]*row_offset;
+    int col_size = m_Size[col_index];
+
+    PixelType* imageBuffer = img->GetBufferPointer();
+    
+    for(int tzy_offset = tz_offset; tzy_offset < row_size; tzy_offset+=row_offset){
+      for(int col = 0; col < col_size * col_offset; col+=col_offset){
+        int tzyx_offset = tzy_offset + col;
+        it.Set(imageBuffer[tzyx_offset]);
+        ++it;
+      }
+    }
+
+    int buf = (int)slice->GetBufferPointer();
+    return buf/sizeof(PixelType);
   }

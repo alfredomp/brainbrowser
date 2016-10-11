@@ -425,24 +425,28 @@
             37: function() {
               if (volume.position[axis_name] > 0) {
                 volume.position[axis_name]--;
+                volume.position_continuous[axis_name]--;
               }
             },
             // Up
             38: function() {
               if (volume.position[axis_name] < volume.header[axis_name].space_length) {
                 volume.position[axis_name]++;
+                volume.position_continuous[axis_name]++;
               }
             },
             // Right
             39: function() {
               if (volume.position[axis_name] < volume.header[axis_name].space_length) {
                 volume.position[axis_name]++;
+                volume.position_continuous[axis_name]++;
               }
             },
             // Down
             40: function() {
               if (volume.position[axis_name] > 0) {
                 volume.position[axis_name]--;
+                volume.position_continuous[axis_name]--;
               }
             }
           };

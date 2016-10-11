@@ -324,7 +324,7 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
 
     viewer.loadVolume({
         volumes: viewer.volumes,
-        type: "overlay",
+        type: "overlayVolumes",
         template: description.template,
         views: description.views || ["xspace", "yspace", "zspace"],
         views_description: description.views_description,
@@ -406,10 +406,6 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
       volume.color_map = default_color_map;
       volume.display = createVolumeDisplay(viewer.dom_element, vol_id, volume_description);
       volume.propagateEventTo("*", viewer);
-
-      ["xspace", "yspace", "zspace"].forEach(function(axis) {
-        volume.position[axis] = Math.floor(volume.header[axis].space_length / 2);
-      });
 
       volume.display.forEach(function(panel) {
         panel.updateSlice(function() {
@@ -501,7 +497,16 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
 
   // Create canvases and add mouse interface.
   function createVolumeDisplay(dom_element, vol_id, volume_description) {
+
     var container = document.createElement("div");
+    if(volume_description.id !== undefined){
+      if(dom_element.id === "brainbrowser-" + volume_description.id){
+        dom_element.appendChild(container);
+      }
+    }else{
+      dom_element.appendChild(container);
+    }
+    
 
     if(volume_description.style){
       var att = document.createAttribute("style");
@@ -538,7 +543,7 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
 
       var volumes = [volume];
       var volumes_length = 1;
-      if(volume.type === 'overlay'){
+      if(volume.volumes){
         volumes_length = volume.volumes.length;
         volumes = volume.volumes;
       }
@@ -579,6 +584,7 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
         canvas_div: div,
         view_description: view_description,
         canvas_layers: canvas_layers,
+        canvas: canvas_layers[canvas_layers.length - 1].canvas,
         image_translate: {
           x: default_panel_width/2,
           y: default_panel_height/2
@@ -597,7 +603,6 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
       }
 
       var canvas_layer_cursor = createCanvas("canvas_layer_" + panel.axis + "_cursor", default_panel_width, default_panel_height, canvas_layers.length);
-      canvas_layer_cursor.canvas.style.backgroundColor = "transparent";
       canvas_layer_cursor.draw = panel.drawCursorLayer;
 
       canvas_layers.push(canvas_layer_cursor);

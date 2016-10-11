@@ -813,7 +813,7 @@ $(function() {
                   
                   var volpos = panel.getVolumePosition(x, y);
                   if(volpos){
-                    panel.drawCurrentSlice();
+                    //panel.drawCurrentSlice();
 
                     var cursorpos = panel.getCursorPosition(volpos.slice_x, volpos.slice_y);
                     panel.drawMousePointer("#FFFFFF", cursorpos);
