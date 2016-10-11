@@ -31,18 +31,18 @@
   /**
   * @doc function
   * @name BrainBrowser.static methods:createColorMap
-  * @param {string}  data The color map data as a string.
+  * @param {string} data The color map data as a string.
   * @param {object} options Options for the color map.
   * Options include the following:
   *
   * * **clamp** {boolean} Should values be clamped to range?
   * * **flip** {boolean} Invert mapping?
   * * **scale** {number} Scale to use (usually 1 or 255).
-  * * **contrast** {number} Color contrast. 
-  * * **brightness** {number} Extra intensity for colors. 
-  * 
+  * * **contrast** {number} Color contrast.
+  * * **brightness** {number} Extra intensity for colors.
+  *
   * @returns {object} Color map object.
-  * 
+  *
   * @description
   * Factory function to produce color map object from a string of data. A given
   * color map is a set of colors to which intensity data can be mapped for display.
@@ -53,10 +53,10 @@
   BrainBrowser.createColorMap = function(data, options) {
     options = options || {};
 
-    var clamp = options.clamp === undefined ? true : options.clamp;
-    var flip = options.flip || false;
-    var scale = options.scale || 1;
-    var contrast = options.contrast || 1;
+    var clamp      = options.clamp === undefined ? true : options.clamp;
+    var flip       = options.flip       || false;
+    var scale      = options.scale      || 1;
+    var contrast   = options.contrast   || 1;
     var brightness = options.brightness || 0;
 
     var color_map_colors;
@@ -138,7 +138,7 @@
     /**
     * @doc object
     * @name color_map
-    * 
+    *
     * @description
     * Object representing the currently loaded color map.
     */
@@ -163,12 +163,12 @@
       * * **clamp** {boolean} Should values be clamped to range (overrides color map default)?
       * * **flip** {boolean} Invert mapping (overrides color map default)?
       * * **scale** {number} Scale to use (usually 1 or 255, overrides color map default).
-      * * **contrast** {number} Color contrast (overrides color map default). 
-      * * **brightness** {number} Extra intensity for colors (overrides color map default). 
+      * * **contrast** {number} Color contrast (overrides color map default).
+      * * **brightness** {number} Extra intensity for colors (overrides color map default).
       * * **default_colors** {array} Colors to use if value is out of range.
       * * **destination** {array} Array to write the colors to (instead of creating
-      *   a new array). 
-      * 
+      *   a new array).
+      *
       * @returns {array} Colors modified based on options.
       *
       * @description
@@ -269,16 +269,16 @@
       * @param {object} options Options for the color mapping.
       * Options include the following:
       *
-      * * **format** {string} Can be **float** for 0-1 range rgb array, 
+      * * **format** {string} Can be **float** for 0-1 range rgb array,
       *   **255** for 0-255 range rgb array, or "hex" for a hex string.
       * * **min** {number} Minimum intensity value.
       * * **max** {number} Maximum intensity value.
       * * **clamp** {boolean} Should values be clamped to range (overrides color map default)?
       * * **flip** {boolean} Invert mapping (overrides color map default)?
       * * **scale** {number} Scale to use (usually 1 or 255, overrides color map default).
-      * * **contrast** {number} Color contrast (overrides color map default). 
-      * * **brightness** {number} Extra intensity for colors (overrides color map default). 
-      * 
+      * * **contrast** {number} Color contrast (overrides color map default).
+      * * **brightness** {number} Extra intensity for colors (overrides color map default).
+      *
       * @returns {array|string} Color parsed from the value given.
       *
       * @description
@@ -355,7 +355,7 @@
       * @name color_map.color_map:createElement
       * @param {number} min Min value of the color data.
       * @param {number} max Max value of the color data.
-      * 
+      *
       * @description
       * Create an element representing the color map.
       * ```js
@@ -367,8 +367,8 @@
         var context;
         var colors = color_map.colors;
         var range = max - min;
-        
-        canvas = createCanvas(colors, 20, 40, flip);
+
+        canvas  = createCanvas(colors, 20, 40, flip);
         context = canvas.getContext("2d");
 
         context.fillStyle = "#FFA000";
@@ -416,7 +416,7 @@
       }
     }
 
-    // Creates an canvas with the color_map of colors
+    // Creates a canvas with the color_map of colors
     // from low(left) to high(right) values
     //   colors: array of colors
     //   color_height: height of the color bar
@@ -428,13 +428,13 @@
       var context;
       var old_scale;
 
-      canvas.width = 256;
+      canvas.width  = 256;
       canvas.height = full_height;
 
       for (i = 0; i < 256; i++) {
         value_array[i] = i;
       }
-      
+
       old_scale = color_map.scale;
       color_map.scale = 255;
       colors = color_map.mapColors(value_array);
@@ -449,10 +449,9 @@
       }
 
       return canvas;
-
     }
-    
-    
+
+
 
     return color_map;
 

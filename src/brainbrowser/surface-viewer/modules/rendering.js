@@ -23,14 +23,20 @@
 /*
 * Author: Tarek Sherif <tsherif@gmail.com> (http://tareksherif.ca/)
 * Author: Paul Mougel
+* Author: Lindsay Lewis <lindsayblewis@gmail.com>
+* Author: Natacha Beck <natabeck@gmail.com>
 */
- 
+
 BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
   "use strict";
-  
+
   var THREE = BrainBrowser.SurfaceViewer.THREE;
-  
-  var renderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
+
+  var renderer = new THREE.WebGLRenderer({
+    preserveDrawingBuffer: true,
+    alpha: true,
+    autoClear: false,
+  });
   var scene = new THREE.Scene();
   var camera = new THREE.PerspectiveCamera(30, viewer.dom_element.offsetWidth / viewer.dom_element.offsetHeight, 1, 3000);
   var default_camera_distance = 500;
@@ -43,9 +49,9 @@ BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
   var old_zoom_level;
 
   viewer.model = new THREE.Object3D();
-  
+
   scene.add(viewer.model);
-  
+
   /**
   * @doc function
   * @name viewer.rendering:render
@@ -59,14 +65,14 @@ BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
     var dom_element = viewer.dom_element;
     renderer.setClearColor(0x000000);
     dom_element.appendChild(renderer.domElement);
-    
+
     camera.position.z = default_camera_distance;
-    
+
     light.position.set(0, 0, default_camera_distance);
     scene.add(light);
-        
+
     viewer.updateViewport();
-    
+
     renderFrame();
   };
 
@@ -104,7 +110,7 @@ BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
   viewer.canvasDataURL = function() {
     return renderer.domElement.toDataURL();
   };
-  
+
   /**
   * @doc function
   * @name viewer.rendering:addEffect
@@ -142,7 +148,7 @@ BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
 
     viewer.updated = true;
   };
-  
+
   /**
   * @doc function
   * @name viewer.rendering:setCameraPosition
@@ -161,7 +167,7 @@ BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
 
     viewer.updated = true;
   };
-  
+
   /**
   * @doc function
   * @name viewer.rendering:resetView
@@ -175,7 +181,7 @@ BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
     var model = viewer.model;
     var inv = new THREE.Matrix4();
     inv.getInverse(model.matrix);
-  
+
     model.applyMatrix(inv);
     camera.position.set(0, 0, default_camera_distance);
     light.position.set(0, 0, default_camera_distance);
@@ -198,26 +204,29 @@ BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
           shape.position.set(0, 0, 0);
         }
         shape.rotation.set(0, 0, 0);
+        shape.material.opacity = 1;
       }
     });
-    
+
     viewer.zoom = 1;
 
     viewer.updated = true;
   };
-  
+
   /**
   * @doc function
   * @name viewer.rendering:setClearColor
   * @param {number} color A hexadecimal number representing the RGB color to use.
+  * @param {number} define the opacity.
   * @description
   * Updates the clear color of the viewer.
   * ```js
   * viewer.setClearColor(0xFF0000);
   * ```
   */
-  viewer.setClearColor = function(color)  {
-    renderer.setClearColor(color, 1.0);
+  viewer.setClearColor = function(color,alpha)  {
+    if (alpha === undefined) alpha = 1;
+    renderer.setClearColor(color, alpha);
 
     viewer.updated = true;
   };
@@ -231,6 +240,8 @@ BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
   * @param {number} radius Radius of the sphere (default: 2).
   * @param {number} color Color of the sphere as a hexadecimal integer (default: 0xFF0000).
   *
+  * @returns {object} The sphere itself.
+  *
   * @description Draw a sphere in the current scene. Handy for debugging.
   * ```js
   * viewer.drawDot(10, 5, 15, 3, 0x00FF00);
@@ -239,14 +250,14 @@ BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
   viewer.drawDot = function(x, y, z, radius, color) {
     radius = radius || 2;
     radius = radius >= 0 ? radius : 0;
-    color = color >= 0 ? color : 0xFF0000;
+    color  = color  >= 0 ? color  : 0xFF0000;
 
     var geometry = new THREE.SphereGeometry(radius);
     var material = new THREE.MeshBasicMaterial({color: color});
-  
+
     var sphere = new THREE.Mesh(geometry, material);
     sphere.position.set(x, y, z);
-  
+
     if (viewer.model) {
       viewer.model.add(sphere);
     } else {
@@ -258,7 +269,180 @@ BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
     return sphere;
 
   };
-  
+
+  /**
+  * @doc function
+  * @name viewer.rendering:drawGrid
+  * @param {number} size The size of the grid.
+  * @param {number} step The size of the step between 2 lines.
+  * @param {object} options Options, which include the following:
+  *
+  * * **name** The name of the object.
+  * * **color_center_line** The color of the centerline as a hexadecimal integer (default 0x444444).
+  * * **color_grid** The color of the lines of the grid as a hexadecimal integer (default 0x888888).
+  * * **x** The x coordinate (default: 0).
+  * * **y** The y coordinate (default: 0).
+  * * **z** The z coordinate (default: 0).
+  * * **euler_rotation** The Euler angles to apply.
+  *
+  * @returns {object} The grid itself.
+  *
+  * @description Draw a Grid in the current scene.
+  * ```js
+  * var euler_rotation = new THREE.Euler( 0, 0, Math.PI/2, 'XYZ' );
+  * viewer.drawGrid(100, 10, {euler_rotation: euler_rotation});
+  * ```
+  */
+  viewer.drawGrid = function(size, step, options) {
+    options               = options || {};
+    var name              = options.name;
+    var color_center_line = options.color_center_line;
+    var color_grid        = options.color_grid;
+    var x                 = options.x;
+    var y                 = options.y;
+    var z                 = options.z;
+    var euler_rotation    = options.euler_rotation;
+
+    // Define default size and step
+    if (size === undefined || size <= 0) { size = 100; }
+    if (step === undefined || step <= 0) { step = 10; }
+
+    // Define default colors
+    color_center_line = color_center_line >= 0 ? color_center_line : 0x444444;
+    color_grid        = color_grid        >= 0 ? color_grid        : 0x888888;
+
+    // Define default position
+    x = x || 0;
+    y = y || 0;
+    z = z || 0;
+
+    // Create the grid
+    var grid  = new THREE.GridHelper(size, step);
+    grid.name = name;
+    grid.setColors(color_center_line, color_grid);
+    grid.position.set(x,y,z);
+    // Used euler_rotation only if present
+    if ( euler_rotation !== undefined ) { grid.setRotationFromEuler(euler_rotation); }
+
+    if (viewer.model) {
+      viewer.model.add(grid);
+    } else {
+      scene.add(grid);
+    }
+
+    viewer.updated = true;
+
+    return grid;
+  };
+
+  /**
+  * @doc function
+  * @name viewer.rendering:drawLine
+  * @param {object} start A Vector3, start of the line segment
+  * @param {object} end A Vector3, end of the line segment
+  * @param {object} options Options, which include the following:
+  *
+  * * **color** The color of the line as a hexadecimal integer (default 0x444444).
+  * * **dashed** If true create a dashed line
+  * * **draw**   If false don't draw the line
+  *
+  * @returns {object} The line itself.
+  *
+  * @description Draw a line in the current scene.
+  * ```js
+  * var start = new THREE.Vector3(0,0,0);
+  * var end   = new THREE.Vector3(200,200,200);
+  * viewer.drawLine(start, end, {dashed: true});
+  * ```
+  */
+  viewer.drawLine = function( start, end, options ) {
+    options      = options || {};
+    var color    = options.color >= 0 ? options.color : 0x444444;
+
+    // Create the geometry
+    var geometry = new THREE.Geometry();
+    geometry.vertices.push( start.clone() );
+    geometry.vertices.push( end.clone() );
+    geometry.computeLineDistances();
+
+    // Set the material according with the dashed option
+    var material = options.dashed === true ?
+                     new THREE.LineDashedMaterial({ linewidth: 3, color: color, gapSize: 3 })
+                   : new THREE.LineBasicMaterial( { linewidth: 3, color: color });
+
+    var line = new THREE.Line( geometry, material, THREE.LinePieces );
+
+    if (options.draw === false) {return line;}
+
+    if (viewer.model) {
+      viewer.model.add(line);
+    } else {
+      scene.add(line);
+    }
+
+    viewer.updated = true;
+
+    return line;
+  };
+
+  /**
+  * @doc function
+  * @name viewer.rendering:drawAxes
+  * @param {number} size Define the size of the line representing the axes.
+  * @param {object} options Options, which include the following:
+  *
+  * * **name** The name of the axes
+  * * **center** A Vector3, that represent the orgin of the axes
+  * * **x_color** The color of the line as a hexadecimal integer (default 0xff0000).
+  * * **y_color** The color of the line as a hexadecimal integer (default 0x00ff00).
+  * * **z_color** The color of the line as a hexadecimal integer (default 0x0000ff).
+  * * **complete** If true draw postive (plain) and negative axes (dashed)
+  *
+  *
+  * @returns {object} The axes itself.
+  *
+  * @description
+  * Draw Axes in the current scene
+  * ```js
+  *   viewer.drawAxes(300)
+  * ```
+  */
+  viewer.drawAxes = function(size, options) {
+    size         = size    || 300;
+    options      = options || {};
+    var name     = options.name   || "axes";
+    var center   = options.center || new THREE.Vector3(0,0,0);
+    var x_color  = options.x_color >= 0 ? options.x_color : 0xff0000 ;
+    var y_color  = options.y_color >= 0 ? options.y_color : 0x00ff00 ;
+    var z_color  = options.z_color >= 0 ? options.z_color : 0x0000ff ;
+    var complete = options.complete === true;
+
+    var axes  = new THREE.Object3D();
+    axes.name = name;
+
+    // X axes
+    axes.add(viewer.drawLine(center, new THREE.Vector3( size, 0, 0), {color: x_color, dashed: false, draw: false}));
+    if (complete) { axes.add(viewer.drawLine(center, new THREE.Vector3(-size, 0, 0), {color: x_color, dashed: true , draw: false})); }
+
+    // Y axes
+    axes.add(viewer.drawLine(center, new THREE.Vector3(0,  size, 0), {color: y_color, dashed: false, draw: false}));
+    if (complete) { axes.add(viewer.drawLine(center, new THREE.Vector3(0, -size, 0), {color: y_color, dashed: true, draw: false})); }
+
+    // Z axes
+    axes.add(viewer.drawLine(center, new THREE.Vector3(0, 0,  size), {color: z_color, dashed: false, draw: false}));
+    if (complete) { axes.add(viewer.drawLine(center, new THREE.Vector3(0, 0, -size), {color: z_color, dashed: true,  draw: false})); }
+
+    if (viewer.model) {
+      viewer.model.add(axes);
+    } else {
+      scene.add(axes);
+    }
+
+    viewer.updated = true;
+
+    return axes;
+  };
+
   /**
   * @doc function
   * @name viewer.rendering:pick
@@ -328,7 +512,7 @@ BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
         intersect_face.b,
         intersect_face.c
       ];
-      
+
       if (intersect_object.userData.annotation_info) {
         vertex_data = {
           index: intersect_object.userData.annotation_info.vertex,
@@ -350,7 +534,7 @@ BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
         } else {
           cx = cy = cz = 0;
         }
-        
+
 
         inv_matrix.getInverse(intersect_object.matrixWorld);
         intersect_point = intersection.point.applyMatrix4(inv_matrix);
@@ -416,7 +600,7 @@ BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
           object: intersect_object
         };
       }
-      
+
 
     } else {
       vertex_data = null;
@@ -424,7 +608,7 @@ BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
 
     return vertex_data;
   };
-  
+
   ////////////////////////////////////
   // PRIVATE FUNCTIONS
   ////////////////////////////////////
@@ -436,12 +620,12 @@ BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
     var rotation;
     var position = camera.position;
     var new_z = default_camera_distance / viewer.zoom;
-    
+
     window.requestAnimationFrame(renderFrame);
-    
+
     last_frame = current_frame || timestamp;
     current_frame = timestamp;
-    
+
     delta = current_frame - last_frame;
     rotation = delta * 0.00015;
 
@@ -599,7 +783,7 @@ BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
 
     canvas.addEventListener("mousewheel", wheelHandler, false);
     canvas.addEventListener("DOMMouseScroll", wheelHandler, false); // Dammit Firefox
-    
+
     canvas.addEventListener( 'contextmenu', function(event) {
       event.preventDefault();
     }, false );
@@ -607,6 +791,6 @@ BrainBrowser.SurfaceViewer.modules.rendering = function(viewer) {
   })();
 
 };
- 
- 
- 
+
+
+

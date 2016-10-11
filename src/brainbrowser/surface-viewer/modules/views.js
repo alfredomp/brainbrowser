@@ -44,6 +44,11 @@ BrainBrowser.SurfaceViewer.modules.views = function(viewer) {
         model.getObjectByName("right").rotation.z += Math.PI / 2;
         model.rotation.x -= Math.PI / 2;
       }
+      else {
+        model.rotation.x += Math.PI / 2;
+        model.rotation.y += Math.PI;
+        model.rotation.z += Math.PI / 2;
+      }
     },
 
     lateralView: function(model_data) {
@@ -60,6 +65,11 @@ BrainBrowser.SurfaceViewer.modules.views = function(viewer) {
         right_child.rotation.z += Math.PI / 2;
         model.rotation.x += Math.PI / 2;
         model.rotation.y += Math.PI;
+      }
+      else {
+        model.rotation.x += Math.PI / 2;
+        model.rotation.y += Math.PI;
+        model.rotation.z -= Math.PI / 2;
       }
     },
 
@@ -78,7 +88,7 @@ BrainBrowser.SurfaceViewer.modules.views = function(viewer) {
       viewer.model.rotation.x -= Math.PI / 2;
     }
   };
-  
+
   /**
   * @doc function
   * @name viewer.views:setTransparency
@@ -110,8 +120,8 @@ BrainBrowser.SurfaceViewer.modules.views = function(viewer) {
     shapes.forEach(function(shape) {
       material = shape.material;
       material.opacity = alpha;
-      
-      if (alpha === 1) {
+
+      if ((alpha === 1) || (alpha > 1)) {
         material.transparent = false;
       } else {
         material.transparent = true;
@@ -123,7 +133,7 @@ BrainBrowser.SurfaceViewer.modules.views = function(viewer) {
         wireframe.material.transparent = material.transparent;
       }
     });
-    
+
     viewer.updated = true;
   };
 
@@ -148,7 +158,7 @@ BrainBrowser.SurfaceViewer.modules.views = function(viewer) {
     var shape_name = options.shape_name;
     var shape = viewer.model.getObjectByName(shape_name);
     var shapes, wireframe;
-    
+
     if (shape) {
       shapes = [shape];
     } else {
@@ -171,6 +181,7 @@ BrainBrowser.SurfaceViewer.modules.views = function(viewer) {
   * @doc function
   * @name viewer.views:setView
   * @param {string} view_name The name of the view to change to.
+  * @param {string} model_name If more than one model file has been loaded, refer to the appropriate model
   * @description
   * Change to a given view of a split data set. (**Note:** this is
   * only effective for a split dataset, e.g. two hemispheres of a brain).
@@ -256,7 +267,7 @@ BrainBrowser.SurfaceViewer.modules.views = function(viewer) {
       } else {
         color_buffer = geometry.color;
       }
-      
+
       wire_geometry.addAttribute("position", position_buffer);
       wire_geometry.addAttribute("color", color_buffer);
 
@@ -300,6 +311,6 @@ BrainBrowser.SurfaceViewer.modules.views = function(viewer) {
     wireframe.material.visible = is_wireframe;
     viewer.updated = true;
   }
-  
+
 };
 

@@ -122,7 +122,6 @@ module.exports = function(grunt) {
             BrainBrowser: true,
             alert: true,
             console: true,
-            Zlib: true,
             Module: true,
             FS: true
           }

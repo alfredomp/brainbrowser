@@ -225,10 +225,9 @@
 
       element.addEventListener("mousemove", function(event) {
         var rect = element.getBoundingClientRect();
-        var x = event.x? event.x : event.clientX;
-        var y = event.y? event.y : event.clientY;
-        mouse.x = x - rect.left;
-        mouse.y = y - rect.top;
+        mouse.x = event.x - rect.left;
+        mouse.y = event.y - rect.top;
+
       }, false);
 
       element.addEventListener("mousedown", function(event) {

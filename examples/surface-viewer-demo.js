@@ -2,7 +2,7 @@
 * BrainBrowser: Web-based Neurological Visualization Tools
 * (https://brainbrowser.cbrain.mcgill.ca)
 *
-* Copyright (C) 2011 
+* Copyright (C) 2011
 * The Royal Institution for the Advancement of Learning
 * McGill University
 *
@@ -43,7 +43,7 @@ $(function() {
   var loading_div = $("#loading");
   function showLoading() { loading_div.show(); }
   function hideLoading() { loading_div.hide(); }
-  
+
 
   // Make sure WebGL is available.
   if (!BrainBrowser.WEBGL_ENABLED) {
@@ -225,7 +225,7 @@ $(function() {
         function inputRangeChange() {
           var min = parseFloat(min_input.val());
           var max = parseFloat(max_input.val());
-          
+
           slider.slider("values", 0, min);
           slider.slider("values", 1, max);
           viewer.setIntensityRange(intensity_data, min, max);
@@ -343,12 +343,17 @@ $(function() {
     $("#clear_color").change(function(e){
       viewer.setClearColor(parseInt($(e.target).val(), 16));
     });
-    
+
     // Reset to the default view.
     $("#resetview").click(function() {
       // Setting the view to its current view type will
-      // automatically reset its position.
+      // automatically reset its position and opacity.
       viewer.setView($("[name=hem_view]:checked").val());
+
+      // Reset all opacity sliders in the UI to 100%
+      $(".opacity-slider").each(function(idx,opacity_slider) {
+        $(opacity_slider).slider("value",100);
+      });
     });
 
     // Set the visibility of the currently loaded model.
@@ -362,23 +367,23 @@ $(function() {
       shape.visible = input.is(":checked");
       viewer.updated = true;
     });
-    
+
     // Set the view type (medial, lateral,
     // inferior, anterior, posterior).
     $("[name=hem_view]").change(function() {
       viewer.setView($("[name=hem_view]:checked").val());
     });
-    
+
     // Toggle wireframe.
     $("#meshmode").change(function() {
       viewer.setWireframe($(this).is(":checked"));
     });
-    
+
     // Toggle 3D anaglyph effect.
     $("#threedee").change(function() {
       viewer.setEffect($(this).is(":checked") ? "AnaglyphEffect" : "None");
     });
-    
+
     // Grab a screenshot of the canvas.
     $("#screenshot").click(function() {
       var dom_element = viewer.dom_element;
@@ -386,14 +391,14 @@ $(function() {
       var spectrum_canvas = document.getElementById("spectrum-canvas");
       var context = canvas.getContext("2d");
       var viewer_image = new Image();
-      
+
       canvas.width = dom_element.offsetWidth;
       canvas.height = dom_element.offsetHeight;
-    
+
       // Display the final image in a dialog box.
       function displayImage() {
         var result_image = new Image();
-        
+
         result_image.onload = function() {
           $("<div></div>").append(result_image).dialog({
             title: "Screenshot",
@@ -401,10 +406,10 @@ $(function() {
             width: result_image.width
           });
         };
-        
+
         result_image.src = canvas.toDataURL();
       }
-   
+
       // Grab the spectrum canvas to display with the
       // image.
       function getSpectrumImage() {
@@ -415,7 +420,7 @@ $(function() {
         };
         spectrum_image.src = spectrum_canvas.toDataURL();
       }
-      
+
       // Draw an image of the viewer area, add the spectrum
       // image it its available, and display everything
       // in a dialog box.
@@ -427,15 +432,66 @@ $(function() {
           displayImage();
         }
       };
-      
+
       viewer_image.src = viewer.canvasDataURL();
     });
-    
+
     // Control autorotation.
     $("#autorotate-controls").children().change(function() {
       viewer.autorotate.x = $("#autorotateX").is(":checked");
       viewer.autorotate.y = $("#autorotateY").is(":checked");
       viewer.autorotate.z = $("#autorotateZ").is(":checked");
+    });
+
+    // Control grid
+    $("#grid-controls").children().change(function() {
+      var grid_name = this.id;
+      var grid = viewer.model.getObjectByName(grid_name);
+      var rotation;
+      var color_grid;
+      var is_checked = $(this).is(":checked");
+
+      // If the grid already exists
+      if (grid !== undefined) {
+        grid.visible   = is_checked;
+        viewer.updated = true;
+        return;
+      }
+
+      // Create and display the grid.
+      rotation = new THREE.Euler();
+      if (grid_name === "gridX") {
+        rotation.set(0, 0, Math.PI/2, "XYZ");
+        color_grid = 0x00ff00;
+      }
+      if (grid_name === "gridY") {
+        rotation.set(0, Math.PI/2, 0, "XYZ");
+        color_grid = 0x0000ff;
+      }
+      if (grid_name === "gridZ") {
+        rotation.set(Math.PI/2, 0, 0, "XYZ");
+        color_grid = 0xff0000;
+      }
+
+      viewer.drawGrid(100, 10, {euler_rotation: rotation, name: grid_name, color_grid: color_grid});
+
+    });
+
+    // Control Axes
+    $("#axes-controls").change(function() {
+      var axes_name  = this.id;
+      var is_checked = $(this).is(":checked");
+      var axes       = viewer.model.getObjectByName(axes_name);
+
+      // If the axes already exists
+      if (axes !== undefined) {
+        axes.visible   = is_checked;
+        viewer.updated = true;
+        return;
+      }
+
+      viewer.drawAxes(150, {name: axes_name});
+
     });
 
     // Color map URLs are read from the config file and added to the
@@ -475,7 +531,7 @@ $(function() {
         $("#pick-z").html(pick_info.point.z.toPrecision(4));
         $("#pick-index").html(pick_info.index);
         $("#annotation-wrapper").show();
-        
+
         picked_object = pick_info.object;
         model_data = viewer.model_data.get(picked_object.userData.model_name);
         intensity_data = model_data.intensity_data[0];
@@ -551,7 +607,7 @@ $(function() {
         $("#pick-index").html("");
         $("#annotation-wrapper").hide();
       }
-  
+
     });
 
     $("#pick-value").change(function() {
@@ -629,19 +685,19 @@ $(function() {
     // Load demo models.
     $("#examples").click(function(e) {
       current_request++;
-      
+
       var name = $(e.target).attr("data-example-name");
       var matrixRotX, matrixRotY, matrixRotZ;
-      
+
       if (current_request_name === name) return;
       current_request_name = name;
-      
+
       //Create a closure to compare current request number to number
       // at the time request was sent.
       function defaultCancelOptions(request_number) {
         return function() { return request_number !== current_request; };
       }
-      
+
       loading_div.show();
       viewer.clearScreen();
 
@@ -833,11 +889,11 @@ $(function() {
           viewer.model.applyMatrix(matrixRotY.multiply(matrixRotZ.multiply(matrixRotX)));
         }
       };
-      
+
       if (examples.hasOwnProperty(name)) {
         examples[name]();
       }
-      
+
       return false;
     });
 

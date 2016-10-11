@@ -159,7 +159,6 @@
       
       return target;
     },
-
     /**
     * @doc function
     * @name VolumeViewer.utils.flipArray

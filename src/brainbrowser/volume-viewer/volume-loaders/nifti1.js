@@ -24,36 +24,25 @@
 * Author: Nicolas Kassis
 * Author: Tarek Sherif <tsherif@gmail.com> (http://tareksherif.ca/)
 * Author: Robert D. Vincent <robert.d.vincent@mcgill.ca>
-* 
-* Loads NIfTI-1 files for volume viewer. For details on the NIfTI-1 format, 
+*
+* Loads NIfTI-1 files for volume viewer. For details on the NIfTI-1 format,
 * see: http://nifti.nimh.nih.gov/nifti-1/documentation/nifti1fields
 */
 
 (function() {
   "use strict";
-     
+
   var VolumeViewer = BrainBrowser.VolumeViewer;
-  var image_creation_context = document.createElement("canvas").getContext("2d");
 
   VolumeViewer.volume_loaders.nifti1 = function(description, callback) {
     var error_message;
     if (description.nii_url) {
       BrainBrowser.loader.loadFromURL(description.nii_url, function(nii_data) {
-        var url = description.nii_url;
-        var end = url.indexOf('?');
-        if(end !== -1){
-          url = url.slice(0, end);
-        }
-        if(url.indexOf(".gz") !== -1){
-          var inflate = new Zlib.Gunzip(new Uint8Array(nii_data));
-          var data = inflate.decompress();
-          nii_data = data.buffer;
-        }
         parseNifti1Header(nii_data, function(header) {
           createNifti1Volume(header, nii_data, callback);
         });
-      }, { result_type: "arraybuffer" });
-                                        
+      }, {result_type: "arraybuffer" });
+
     } else if (description.nii_file) {
       BrainBrowser.loader.loadFromFile(description.nii_file, function(nii_data) {
         parseNifti1Header(nii_data, function(header) {
@@ -67,7 +56,83 @@
       BrainBrowser.events.triggerEvent("error", { message: error_message });
       throw new Error(error_message);
     }
-    
+
+  };
+
+  VolumeViewer.utils.transformToMinc = function(transform, header) {
+    var x_dir_cosines = [];
+    var y_dir_cosines = [];
+    var z_dir_cosines = [];
+
+    // A tiny helper function to calculate the magnitude of the rotational
+    // part of the transform.
+    //
+    function magnitude(v) {
+      var dotprod = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+      if (dotprod <= 0) {
+        dotprod = 1.0;
+      }
+      return Math.sqrt(dotprod);
+    }
+
+    // Calculate the determinant of a 3x3 matrix, from:
+    // http://www.mathworks.com/help/aeroblks/determinantof3x3matrix.html
+    //
+    // det(A) = A_{11} (A_{22}A_{33} - A_{23}A_{32}) -
+    //          A_{12} (A_{21}A_{33} - A_{23}A_{31}) +
+    //          A_{13} (A_{21}A_{32} - A_{22}A_{31})
+    //
+    // Of course, I had to change the indices from 1-based to 0-based.
+    //
+    function determinant(c0, c1, c2) {
+      return (c0[0] * (c1[1] * c2[2] - c1[2] * c2[1]) -
+              c0[1] * (c1[0] * c2[2] - c1[2] * c2[0]) +
+              c0[2] * (c1[0] * c2[1] - c1[1] * c2[0]));
+    }
+
+    // Now that we have the transform, need to convert it to MINC-like
+    // steps and direction_cosines.
+
+    var xmag = magnitude(transform[0]);
+    var ymag = magnitude(transform[1]);
+    var zmag = magnitude(transform[2]);
+
+    var xstep = (transform[0][0] < 0) ? -xmag : xmag;
+    var ystep = (transform[1][1] < 0) ? -ymag : ymag;
+    var zstep = (transform[2][2] < 0) ? -zmag : zmag;
+
+    for (var i = 0; i < 3; i++) {
+      x_dir_cosines[i] = transform[i][0] / xstep;
+      y_dir_cosines[i] = transform[i][1] / ystep;
+      z_dir_cosines[i] = transform[i][2] / zstep;
+    }
+
+    header.xspace.step = xstep;
+    header.yspace.step = ystep;
+    header.zspace.step = zstep;
+
+    // Calculate the corrected start values.
+    var starts = [transform[0][3],
+                  transform[1][3],
+                  transform[2][3]
+                 ];
+
+    // (bert): I believe that the determinant of the direction
+    // cosines should always work out to 1, so the calculation of
+    // this value should not be needed. But I have no idea if NIfTI
+    // enforces this when sform transforms are written.
+    var denom = determinant(x_dir_cosines, y_dir_cosines, z_dir_cosines);
+    var xstart = determinant(starts, y_dir_cosines, z_dir_cosines);
+    var ystart = determinant(x_dir_cosines, starts, z_dir_cosines);
+    var zstart = determinant(x_dir_cosines, y_dir_cosines, starts);
+
+    header.xspace.start = xstart / denom;
+    header.yspace.start = ystart / denom;
+    header.zspace.start = zstart / denom;
+
+    header.xspace.direction_cosines = x_dir_cosines;
+    header.yspace.direction_cosines = y_dir_cosines;
+    header.zspace.direction_cosines = z_dir_cosines;
   };
 
   function parseNifti1Header(raw_data, callback) {
@@ -112,6 +177,7 @@
     var tlength = dview.getUint16(48, littleEndian);
 
     var datatype = dview.getUint16(70, littleEndian);
+    var bitpix = dview.getUint16(72, littleEndian);
 
     var xstep = dview.getFloat32(80, littleEndian);
     var ystep = dview.getFloat32(84, littleEndian);
@@ -129,9 +195,6 @@
     var qform_code = dview.getUint16(252, littleEndian);
     var sform_code = dview.getUint16(254, littleEndian);
 
-    var x_dir_cosines = [];
-    var y_dir_cosines = [];
-    var z_dir_cosines = [];
     var transform = [
       [1, 0, 0, 0],
       [0, 1, 0, 0],
@@ -148,8 +211,14 @@
       header.order = ["time", "zspace", "yspace", "xspace"];
     }
 
+    /* Record the number of bytes per voxel, and note whether we need
+     * to swap bytes in the voxel data.
+     */
+    header.bytes_per_voxel = bitpix / 8;
+    header.must_swap_data = !littleEndian && header.bytes_per_voxel > 1;
+
     if (sform_code > 0) {
-      /* The "Sform", if present, defines an affine transform which is 
+      /* The "Sform", if present, defines an affine transform which is
        * generally assumed to correspond to some standard coordinate
        * space (e.g. Talairach).
        */
@@ -188,48 +257,7 @@
       transform[2][2] = zstep;
     }
 
-    // A tiny helper function to calculate the magnitude of the rotational
-    // part of the transform.
-    //
-    function magnitude(v) {
-      var dotprod = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
-      if (dotprod <= 0) {
-        dotprod = 1.0;
-      }
-      return Math.sqrt(dotprod);
-    }
-
-    // Now that we have the transform, need to convert it to MINC-like 
-    // steps and direction_cosines.
-
-    var xmag = magnitude(transform[0]);
-    var ymag = magnitude(transform[1]);
-    var zmag = magnitude(transform[2]);
-
-    xstep = (transform[0][0] < 0) ? -xmag : xmag;
-    ystep = (transform[1][1] < 0) ? -ymag : ymag;
-    zstep = (transform[2][2] < 0) ? -zmag : zmag;
-
-    for (var i = 0; i < 3; i++) {
-      x_dir_cosines[i] = transform[0][i] / xstep;
-      y_dir_cosines[i] = transform[1][i] / ystep;
-      z_dir_cosines[i] = transform[2][i] / zstep;
-    }
-        
-    header.xspace.step = xstep;
-    header.yspace.step = ystep;
-    header.zspace.step = zstep;
-
-    /* The NIfTI-1 transform already encodes the "corrected" origin
-     * in world space, so there is no need for later correction.
-     */
-    header.xspace.start = transform[0][3];
-    header.yspace.start = transform[1][3];
-    header.zspace.start = transform[2][3];
-
-    header.xspace.direction_cosines = x_dir_cosines;
-    header.yspace.direction_cosines = y_dir_cosines;
-    header.zspace.direction_cosines = z_dir_cosines;
+    VolumeViewer.utils.transformToMinc(transform, header);
 
     header.datatype = datatype;
     header.vox_offset = vox_offset;
@@ -259,7 +287,7 @@
     var d = qd;
     var a, xd, yd, zd;
 
-    // compute a parameter from b,c,d 
+    // compute a parameter from b,c,d
 
     a = 1.0 - (b * b + c * c + d * d);
     if ( a < 1.e-7 ) {           // special case
@@ -272,7 +300,7 @@
       a = Math.sqrt(a);          // angle = 2*arccos(a)
     }
 
-    // load rotation matrix, including scaling factors for voxel sizes 
+    // load rotation matrix, including scaling factors for voxel sizes
 
     xd = (dx > 0.0) ? dx : 1.0;  // make sure are positive
     yd = (dy > 0.0) ? dy : 1.0;
@@ -301,308 +329,38 @@
   }
 
   function createNifti1Volume(header, raw_data, callback) {
-    var byte_data = createNifti1Data(header, raw_data);
-
-    var intensitymin = Number.MAX_VALUE;
-    var intensitymax = -Number.MAX_VALUE;
-
-    for(var i = 0; i < byte_data.length; i++){
-      intensitymin = Math.min(byte_data[i], intensitymin);
-      intensitymax = Math.max(byte_data[i], intensitymax);
-    }
-
-    var volume = {
-      position: {},
-      position_continuous: {},
-      current_time: 0,
-      data: byte_data,
-      header: header,
-      intensity_min: intensitymin,
-      intensity_max: intensitymax,
-      slice: function(axis, slice_num, time) {
-        slice_num = slice_num === undefined ? volume.position[axis] : slice_num;
-        time = time === undefined ? volume.current_time : time;
-
-        var header = volume.header;
-
-        if(header.order === undefined ) {
-          return null;
-        }
-
-        time = time || 0;
-
-        var time_offset = header.time ? time * header.time.offset : 0;
-
-        var axis_space = header[axis];
-        var width_space = axis_space.width_space;
-        var height_space = axis_space.height_space;
-
-        var width = axis_space.width;
-        var height = axis_space.height;
-
-        var axis_space_offset = axis_space.offset;
-        var width_space_offset = width_space.offset;
-        var height_space_offset = height_space.offset;
-
-        var slice_data = new volume.data.constructor(width * height);
-
-        var slice;
-
-        // Rows and colums of the result slice.
-        var row, col;
-
-        // Indexes into the volume, relative to the slice.
-        // NOT xspace, yspace, zspace coordinates!!!
-        var x, y, z;
-
-        // Linear offsets into volume considering an
-        // increasing number of axes: (t) time, 
-        // (z) z-axis, (y) y-axis, (x) x-axis.
-        var tz_offset, tzy_offset, tzyx_offset;
-
-        // Whether the dimension steps positively or negatively.
-        var x_positive = width_space.step  > 0;
-        var y_positive = height_space.step > 0;
-        var z_positive = axis_space.step   > 0;
-
-        // iterator for the result slice.
-        var i = 0;
-
-        z = z_positive ? slice_num : axis_space.space_length - slice_num - 1;
-        tz_offset = time_offset + z * axis_space_offset;
-
-        for (row = height - 1; row >= 0; row--) {
-          y = y_positive ? row : height - row - 1;
-          tzy_offset = tz_offset + y * height_space_offset;
-
-          for (col = 0; col < width; col++) {
-            x = x_positive ? col : width - col - 1;
-            tzyx_offset = tzy_offset + x * width_space_offset;
-
-            slice_data[i++] = volume.data[tzyx_offset];
-          }
-        }
-
-        slice = {
-          axis: axis,
-          data: slice_data,
-          width_space: width_space,
-          height_space: height_space,
-          width: width,
-          height: height
-        };
-
-        if(volume.border){
-          slice = volume.getSliceBorder(slice);
-        }
-        
-        return slice;
-      },
-      
-
-      getSliceBorder: function(slice){
-        var sliceOut = new slice.data.constructor(slice.data);
-        var extent = [-slice.width -1, -slice.width, -slice.width + 1, -1, 1, slice.width -1, slice.width, slice.width + 1];
-        var isBorder = function(slice, n){
-          var ret = false;
-          var lab = slice.data[n];
-          for(var i = 0; i < extent.length && !ret; i++){
-            if(n + extent[i] >= 0 && n + extent[i] < slice.data.length && slice.data[n + extent[i]] !== lab){
-              ret = true;
-              break;
-            }
-          }
-          return ret;
-        };
-        for(var i = 0; i < slice.data.length; i++){
-          if(!isBorder(slice, i)){
-            sliceOut[i] = 0;
-          }
-        }
-        slice.data = sliceOut;
-        return slice;
-      },
-
-
-      getSliceImage: function(slice, zoom, contrast, brightness) {
-
-        var color_map = volume.color_map;
-        var source_image = image_creation_context.createImageData(slice.width, slice.height);
-
-        if (color_map) {
-          color_map.mapColors(slice.data, {
-            min: volume.intensity_min,
-            max: volume.intensity_max,
-            contrast: contrast,
-            brightness: brightness,
-            destination: source_image.data
-          });
-        }
-
-        return source_image;
-      },
-
-      getIntensityValue: function(x, y, z, time) {
-        x = x === undefined ? volume.position.xspace : x;
-        y = y === undefined ? volume.position.yspace : y;
-        z = z === undefined ? volume.position.zspace : z;
-        time = time === undefined ? volume.current_time : time;
-
-        if (x < 0 || x > volume.header.xspace.space_length ||
-            y < 0 || y > volume.header.yspace.space_length ||
-            z < 0 || z > volume.header.zspace.space_length) {
-          return 0;
-        }
-
-        var slice = volume.slice("zspace", z, time);
-
-        return slice.data[(slice.height_space.space_length - y - 1) * slice.width + x];
-      },
-
-      getVolumeDataIntensityValue: function(x, y, z){
-
-        if (x < 0 || x > header[header.order[0]].space_length ||
-            y < 0 || y > header[header.order[1]].space_length ||
-            z < 0 || z > header[header.order[2]].space_length) {
-          return null;
-        }
-
-        var movsize = [ header[header.order[2]].space_length, header[header.order[1]].space_length ];
-        var index =  z + (y)*movsize[0] + (x)*movsize[0]*movsize[1];
-
-        return volume.data[index];
-        
-      },
-
-      setIntensityValue : function(x, y, z, value){
-
-        var movsize = [ header[header.order[2]].space_length, header[header.order[1]].space_length ];
-        var index =  z + (y)*movsize[0] + (x)*movsize[0]*movsize[1];
-        
-        volume.data[index] = value;
-
-      },
-      
-      getVoxelCoords: function() {
-        var header = volume.header;
-        var position = {
-          xspace: header.xspace.step > 0 ? volume.position.xspace : header.xspace.space_length - volume.position.xspace,
-          yspace: header.yspace.step > 0 ? volume.position.yspace : header.yspace.space_length - volume.position.yspace,
-          zspace: header.zspace.step > 0 ? volume.position.zspace : header.zspace.space_length - volume.position.zspace
-        };
-
-        return {
-          i: position[header.order[0]],
-          j: position[header.order[1]],
-          k: position[header.order[2]],
-        };
-      },
-      
-      setVoxelCoords: function(i, j, k) {
-        var header = volume.header;
-        var ispace = header.order[0];
-        var jspace = header.order[1];
-        var kspace = header.order[2];
-        
-        volume.position[ispace] = header[ispace].step > 0 ? i : header[ispace].space_length - i;
-        volume.position[jspace] = header[jspace].step > 0 ? j : header[jspace].space_length - j;
-        volume.position[kspace] = header[kspace].step > 0 ? k : header[kspace].space_length - k;
-      },
-      
-      getWorldCoords: function() {
-        var voxel = volume.getVoxelCoords();
-
-        return volume.voxelToWorld(voxel.i, voxel.j, voxel.k);
-      },
-      
-      setWorldCoords: function(x, y, z) {
-        var voxel = volume.worldToVoxel(x, y, z);
-
-        volume.setVoxelCoords(voxel.i, voxel.j, voxel.k);
-      },
-
-      // Voxel to world matrix applied here is:
-      // cxx * stepx | cyx * stepy | czx * stepz | ox
-      // cxy * stepx | cyy * stepy | czy * stepz | oy
-      // cxz * stepx | cyz * stepy | czz * stepz | oz
-      // 0           | 0           | 0           | 1
-      //
-      // Taken from (http://www.bic.mni.mcgill.ca/software/minc/minc2_format/node4.html)
-      voxelToWorld: function(i, j, k) {
-        var ordered = {};
-        var x, y, z;
-        var header = volume.header;
-
-        ordered[header.order[0]] = i;
-        ordered[header.order[1]] = j;
-        ordered[header.order[2]] = k;
-
-        x = ordered.xspace;
-        y = ordered.yspace;
-        z = ordered.zspace;
-
-        var cx = header.xspace.direction_cosines;
-        var cy = header.yspace.direction_cosines;
-        var cz = header.zspace.direction_cosines;
-        var stepx = header.xspace.step;
-        var stepy = header.yspace.step;
-        var stepz = header.zspace.step;
-        var o = header.voxel_origin;
-
-        return {
-          x: x * cx[0] * stepx + y * cy[0] * stepy + z * cz[0] * stepz + o.x,
-          y: x * cx[1] * stepx + y * cy[1] * stepy + z * cz[1] * stepz + o.y,
-          z: x * cx[2] * stepx + y * cy[2] * stepy + z * cz[2] * stepz + o.z
-        };
-      },
-
-      // World to voxel matrix applied here is:
-      // cxx / stepx | cxy / stepx | cxz / stepx | (-o.x * cxx - o.y * cxy - o.z * cxz) / stepx
-      // cyx / stepy | cyy / stepy | cyz / stepy | (-o.x * cyx - o.y * cyy - o.z * cyz) / stepy
-      // czx / stepz | czy / stepz | czz / stepz | (-o.x * czx - o.y * czy - o.z * czz) / stepz
-      // 0           | 0           | 0           | 1
-      //
-      // Inverse of the voxel to world matrix.
-      worldToVoxel: function(x, y, z) {
-        var header = volume.header;
-        var cx = header.xspace.direction_cosines;
-        var cy = header.yspace.direction_cosines;
-        var cz = header.zspace.direction_cosines;
-        var stepx = header.xspace.step;
-        var stepy = header.yspace.step;
-        var stepz = header.zspace.step;
-        var o = header.voxel_origin;
-        var tx = (-o.x * cx[0] - o.y * cx[1] - o.z * cx[2]) / stepx;
-        var ty = (-o.x * cy[0] - o.y * cy[1] - o.z * cy[2]) / stepy;
-        var tz = (-o.x * cz[0] - o.y * cz[1] - o.z * cz[2]) / stepz;
-
-        var result = {
-          x: Math.round(x * cx[0] / stepx + y * cx[1] / stepx + z * cx[2] / stepx + tx),
-          y: Math.round(x * cy[0] / stepy + y * cy[1] / stepy + z * cy[2] / stepy + ty),
-          z: Math.round(x * cz[0] / stepz + y * cz[1] / stepz + z * cz[2] / stepz + tz)
-        };
-
-        var ordered = {};
-        ordered[header.order[0]] = result.x;
-        ordered[header.order[1]] = result.y;
-        ordered[header.order[2]] = result.z;
-
-        return {
-          i: ordered.xspace,
-          j: ordered.yspace,
-          k: ordered.zspace
-        };
-      }
-    };
-    
+    var volume = VolumeViewer.createVolume(header,
+                                           createNifti1Data(header, raw_data));
+    volume.type = "nifti";
+    volume.intensity_min = volume.header.voxel_min;
+    volume.intensity_max = volume.header.voxel_max;
+    volume.saveOriginAndTransform(header);
     if (BrainBrowser.utils.isFunction(callback)) {
       callback(volume);
     }
   }
 
+  VolumeViewer.utils.swapn = function(byte_data, n_per_item) {
+    for (var d = 0; d < byte_data.length; d += n_per_item) {
+      var hi_offset = n_per_item - 1;
+      var lo_offset = 0;
+      while (hi_offset > lo_offset) {
+        var tmp = byte_data[d + hi_offset];
+        byte_data[d + hi_offset] = byte_data[d + lo_offset];
+        byte_data[d + lo_offset] = tmp;
+        hi_offset--;
+        lo_offset++;
+      }
+    }
+  };
+
   function createNifti1Data(header, raw_data) {
-    
     var native_data = null;
+
+    if (header.must_swap_data) {
+      VolumeViewer.utils.swapn(new Uint8Array(raw_data, header.vox_offset),
+                               header.bytes_per_voxel);
+    }
 
     switch (header.datatype) {
     case 2:                     // DT_UNSIGNED_CHAR
@@ -618,7 +376,7 @@
     case 16:                    // DT_FLOAT
       native_data = new Float32Array(raw_data, header.vox_offset);
       break;
-    case 32:                    // DT_DOUBLE
+    case 64:                    // DT_DOUBLE
       native_data = new Float64Array(raw_data, header.vox_offset);
       break;
     // Values above 256 are NIfTI-specific, and rarely used.
@@ -638,34 +396,28 @@
       throw new Error(error_message);
     }
 
+    var d = 0;                  // Generic loop counter.
+    var slope = header.scl_slope;
+    var inter = header.scl_inter;
+
+    // According to the NIfTI specification, a slope value of zero means
+    // that the data should _not_ be scaled. Otherwise, every voxel is
+    // transformed according to value = value * slope + inter
+    //
+    if (slope !== 0.0) {
+      var float_data = new Float32Array(native_data.length);
+
+      for (d = 0; d < native_data.length; d++) {
+        float_data[d] = native_data[d] * slope + inter;
+      }
+      native_data = float_data; // Return the new float buffer.
+    }
+
+    VolumeViewer.utils.scanDataRange(native_data, header);
+
     if(header.order.length === 4) {
       header.order = header.order.slice(1);
     }
-
-    header.xspace.name = "xspace";
-    header.yspace.name = "yspace";
-    header.zspace.name = "zspace";
-
-    header.voxel_origin = {
-      x: header.xspace.start,
-      y: header.yspace.start,
-      z: header.zspace.start
-    };
-
-    header.xspace.width_space  = header.yspace;
-    header.xspace.width        = header.yspace.space_length;
-    header.xspace.height_space = header.zspace;
-    header.xspace.height       = header.zspace.space_length;
-
-    header.yspace.width_space  = header.xspace;
-    header.yspace.width        = header.xspace.space_length;
-    header.yspace.height_space = header.zspace;
-    header.yspace.height       = header.zspace.space_length;
-
-    header.zspace.width_space  = header.xspace;
-    header.zspace.width        = header.xspace.space_length;
-    header.zspace.height_space = header.yspace;
-    header.zspace.height       = header.yspace.space_length;
 
     // Incrementation offsets for each dimension of the volume.
     header[header.order[0]].offset = header[header.order[1]].space_length * header[header.order[2]].space_length;
@@ -678,5 +430,5 @@
 
     return native_data;
   }
-   
+
 }());

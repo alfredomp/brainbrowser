@@ -30,7 +30,7 @@
 // BrainBrowser Volume Viewer.
 $(function() {
   "use strict";
-  
+
   $(".button").button();
 
   /////////////////////////////////////
@@ -47,7 +47,7 @@ $(function() {
       $("#sync-volumes-wrapper").hide();
       $("#volume-file").hide();
 
-      if ($(this).val() === "functional") {
+      if ($(this).val() === "functional_minc") {
         viewer.clearVolumes();
         viewer.loadVolume({
           type: "minc",
@@ -61,7 +61,7 @@ $(function() {
           $(".slice-display").css("display", "inline");
           $(".volume-controls").css("width", "auto");
         });
-      } else if ($(this).val() === "structural") {
+      } else if ($(this).val() === "structural_minc") {
         $("#sync-volumes-wrapper").show();
         viewer.clearVolumes();
         viewer.loadVolumes({
@@ -92,10 +92,140 @@ $(function() {
             }
           }
         });
+      } else if ($(this).val() === "NIfTI-1"){
+        $("#sync-volumes-wrapper").show();
+        viewer.clearVolumes();
+        viewer.loadVolumes({
+          volumes: [
+            {
+              type: "itkReader",
+              url: "models/T1.nii",
+              template: {
+                element_id: "volume-ui-template",
+                viewer_insert_class: "volume-viewer-display"
+              }
+            },
+            {
+              type: 'itkReader',
+              url: "models/T1_aseg.nii",
+              template: {
+                element_id: "volume-ui-template",
+                viewer_insert_class: "volume-viewer-display"
+              }
+            }
+          ],
+          overlay: {
+            template: {
+              element_id: "overlay-ui-template",
+              viewer_insert_class: "overlay-viewer-display"
+            }
+          },
+          complete: function(){
+            viewer.interaction_type = 1;
+            viewer.volumes[2].display.forEach(function(panel) {
+                  
+              var label = 255;
+              var offset = [];
+              var size = 0;
+              
+              for(var k = -size; k <= size; k++){
+                for(var j = -size; j <= size; j++){
+                  for(var i = -size; i <= size; i++){
+                    var off = [i, j, k];
+                    offset.push(off);
+                  }
+                }
+              }
+              
+              var drawPixel = function(){
+                var point = panel.getVoxelCoordinates();
+
+                if(point){
+                  
+                  var x = point.i;
+                  var y = point.j;
+                  var z = point.k;
+                  
+                  for(var i = 0; i < offset.length; i++){
+                    var off = offset[i];
+                    viewer.volumes[1].setIntensityValue(x + off[0], y  + off[1], z  + off[2], label);
+                  }
+                  
+                  viewer.redrawVolumes();
+                  
+                }
+              };
+
+              var drawMousePointer = function(x, y){
+                
+                var volpos = panel.getVolumePosition(x, y);
+                if(volpos){
+                  var cursorpos = panel.getCursorPosition(volpos.slice_x, volpos.slice_y);
+                  panel.drawMousePointer("#FFFFFF", cursorpos);
+                }
+              };
+
+              var mousedown = false;
+
+              var canvas = panel.canvas_layers[panel.canvas_layers.length - 1].canvas;
+
+              canvas.addEventListener("mousedown", function () {
+                mousedown = true;
+                drawPixel();
+              });
+
+              canvas.addEventListener("mouseup", function () {
+                mousedown = false;
+              });
+
+              canvas.addEventListener("mousemove", function (event) {
+                var element = event.target;
+                
+                if(mousedown && !(event.ctrlKey || event.shiftKey)){
+                  drawPixel();
+                }
+                else{
+                  var rect = element.getBoundingClientRect();
+                  drawMousePointer(event.x - rect.left, event.y - rect.top);
+                }
+              }, false);
+            });
+          }
+        });
+      } else if ($(this).val() === "MGH"){
+        $("#sync-volumes-wrapper").show();
+        viewer.clearVolumes();
+        viewer.loadVolumes({
+          volumes: [
+            {
+              type: "itkReader",
+              url: "models/t1.mgh",
+              template: {
+                element_id: "volume-ui-template",
+                viewer_insert_class: "volume-viewer-display"
+              }
+            },
+            {
+              type: 'itkReader',
+              url: "models/dti.mgh",
+              template: {
+                element_id: "volume-ui-template",
+                viewer_insert_class: "volume-viewer-display"
+              }
+            }
+          ],
+          overlay: {
+            template: {
+              element_id: "overlay-ui-template",
+              viewer_insert_class: "overlay-viewer-display"
+            }
+          }
+        });
       } else {
         $("#volume-file").show();
         viewer.clearVolumes();
       }
+
     });
 
     // Change viewer panel canvas size.
@@ -112,7 +242,7 @@ $(function() {
         viewer.resetDisplays();
         viewer.redrawVolumes();
       }
-      
+
       viewer.synced = synced;
     });
 
@@ -127,7 +257,7 @@ $(function() {
       var canvas = document.createElement("canvas");
       var context = canvas.getContext("2d");
       var img = new Image();
-      
+
       viewer.volumes.forEach(function(volume) {
         volume.display.forEach(function(panel) {
           width = Math.max(width, panel.canvas.width);
@@ -139,7 +269,7 @@ $(function() {
       canvas.height = height * 3;
       context.fillStyle = "#000000";
       context.fillRect(0, 0, canvas.width, canvas.height);
-      
+
       // The active canvas is highlighted by the viewer,
       // so we set it to null and redraw the highlighting
       // isn't shown in the image.
@@ -161,7 +291,7 @@ $(function() {
         viewer.active_panel = active_panel;
         viewer.draw();
       }
-      
+
       // Show the created image in a dialog box.
       img.onload = function() {
         $("<div></div>").append(img).dialog({
@@ -174,13 +304,48 @@ $(function() {
       img.src = canvas.toDataURL();
     });
 
-    // Load a new model from a file that the user has
+    // Load a new model from a MINC file that the user has
     // selected.
-    $("#volume-file-submit").click(function() {
+    $("#volume-file-minc-submit").click(function() {
+      viewer.clearVolumes();
       viewer.loadVolume({
         type: "minc",
         header_file: document.getElementById("header-file"),
         raw_data_file: document.getElementById("raw-data-file"),
+        template: {
+          element_id: "volume-ui-template",
+          viewer_insert_class: "volume-viewer-display"
+        }
+      }, function() {
+        $(".slice-display").css("display", "inline");
+        $(".volume-controls").css("width", "auto");
+      });
+    });
+
+    // Load a new model from a NIfTI-1 file that the user has
+    // selected.
+    $("#volume-file-nifti1-submit").click(function() {
+      viewer.clearVolumes();
+      viewer.loadVolume({
+        type: "nifti1",
+        nii_file: document.getElementById("nifti1-file"),
+        template: {
+          element_id: "volume-ui-template",
+          viewer_insert_class: "volume-viewer-display"
+        }
+      }, function() {
+        $(".slice-display").css("display", "inline");
+        $(".volume-controls").css("width", "auto");
+      });
+    });
+
+    // Load a new model from a MGH file that the user has
+    // selected.
+    $("#volume-file-mgh-submit").click(function() {
+      viewer.clearVolumes();
+      viewer.loadVolume({
+        type: "itkReader",
+        file: document.getElementById("mgh-file"),
         template: {
           element_id: "volume-ui-template",
           viewer_insert_class: "volume-viewer-display"
@@ -210,7 +375,7 @@ $(function() {
         var x = parseFloat(div.find("#world-x-" + vol_id).val());
         var y = parseFloat(div.find("#world-y-" + vol_id).val());
         var z = parseFloat(div.find("#world-z-" + vol_id).val());
-        
+
         // Make sure the values are numeric.
         if (!BrainBrowser.utils.isNumeric(x)) {
           x = 0;
@@ -223,7 +388,14 @@ $(function() {
         }
 
         // Set coordinates and redraw.
-        viewer.volumes[vol_id].setWorldCoords(x, y, z);
+        if (viewer.synced) {
+          viewer.volumes.forEach(function(volume) {
+            volume.setWorldCoords(x, y, z);
+          });
+        }
+        else {
+          viewer.volumes[vol_id].setWorldCoords(x, y, z);
+        }
 
         viewer.redrawVolumes();
       });
@@ -235,7 +407,7 @@ $(function() {
         var i = parseInt(div.find("#voxel-i-" + vol_id).val(), 10);
         var j = parseInt(div.find("#voxel-j-" + vol_id).val(), 10);
         var k = parseInt(div.find("#voxel-k-" + vol_id).val(), 10);
-        
+
         // Make sure the values are numeric.
         if (!BrainBrowser.utils.isNumeric(i)) {
           i = 0;
@@ -249,6 +421,15 @@ $(function() {
 
         // Set coordinates and redraw.
         viewer.volumes[vol_id].setVoxelCoords(i, j, k);
+        if (viewer.synced) {
+          var synced_volume = viewer.volumes[vol_id];
+          var wc = synced_volume.getWorldCoords();
+          viewer.volumes.forEach(function(volume) {
+            if (synced_volume !== volume) {
+              volume.setWorldCoords(wc.x, wc.y, wc.z);
+            }
+          });
+        }
 
         viewer.redrawVolumes();
       });
@@ -290,11 +471,17 @@ $(function() {
         // Slider to modify min and max thresholds.
         var slider = div.find(".slider");
 
+        var volume = viewer.volumes[vol_id];
+
+        // Update the input fields.
+        min_input.val(volume.getVoxelMin());
+        max_input.val(volume.getVoxelMax());
+
         slider.slider({
           range: true,
-          min: 0,
-          max: 255,
-          values: [0, 255],
+          min: volume.getVoxelMin(),
+          max: volume.getVoxelMax(),
+          values: [volume.getVoxelMin(), volume.getVoxelMax()],
           step: 1,
           slide: function(event, ui){
             var values = ui.values;
@@ -316,12 +503,13 @@ $(function() {
         // Input field for minimum threshold.
         min_input.change(function() {
           var value = parseFloat(this.value);
-          
+
           // Make sure input is numeric and in range.
           if (!BrainBrowser.utils.isNumeric(value)) {
-            value = 0;
+            value = volume.getVoxelMin();
           }
-          value = Math.max(0, Math.min(value, 255));
+          value = Math.max(volume.getVoxelMin(),
+                           Math.min(value, volume.getVoxelMax()));
           this.value = value;
 
           // Update the slider.
@@ -334,17 +522,18 @@ $(function() {
 
         max_input.change(function() {
           var value = parseFloat(this.value);
-          
+
           // Make sure input is numeric and in range.
           if (!BrainBrowser.utils.isNumeric(value)) {
-            value = 255;
+            value = volume.getVoxelMax();
           }
-          value = Math.max(0, Math.min(value, 255));
+          value = Math.max(volume.getVoxelMin(),
+                           Math.min(value, volume.getVoxelMax()));
           this.value = value;
 
           // Update the slider.
           slider.slider("values", 1, value);
-          
+
           // Update the volume and redraw.
           volume.intensity_max = value;
           viewer.redrawVolumes();
@@ -360,7 +549,7 @@ $(function() {
         } else {
           return;
         }
-        
+
         var slider = div.find(".slider");
         var time_input = div.find("#time-val-" + vol_id);
         var play_button = div.find("#play-" + vol_id);
@@ -368,7 +557,7 @@ $(function() {
         var min = 0;
         var max = volume.header.time.space_length - 1;
         var play_interval;
-      
+
         slider.slider({
           min: min,
           max: max,
@@ -384,7 +573,7 @@ $(function() {
             $(this).find("a").blur();
           }
         });
-        
+
         time_input.change(function() {
           var value = parseInt(this.value, 10);
           if (!BrainBrowser.utils.isNumeric(value)) {
@@ -399,7 +588,7 @@ $(function() {
           volume.current_time = value;
           viewer.redrawVolumes();
         });
-        
+
         play_button.change(function() {
           if(play_button.is(":checked")){
             clearInterval(play_interval);
@@ -470,7 +659,7 @@ $(function() {
               width: img.width
             });
           };
-          
+
           img.src = canvas.toDataURL();
         });
       });
@@ -491,7 +680,7 @@ $(function() {
             var value = parseFloat(ui.value);
             volume.blend_ratios[0] = 1 - value;
             volume.blend_ratios[1] = value;
-            
+
 
 
             blend_input.val(value);
@@ -501,11 +690,11 @@ $(function() {
             $(this).find("a").blur();
           }
         });
-        
+
         // Input field to select blend values explicitly.
         blend_input.change(function() {
           var value = parseFloat(this.value);
-          
+
           // Check that input is numeric and in range.
           if (!BrainBrowser.utils.isNumeric(value)) {
             value = 0;
@@ -537,18 +726,18 @@ $(function() {
             var value = parseFloat(ui.value);
             volume.display.setContrast(value);
             volume.display.refreshPanels();
-            
+
             contrast_input.val(value);
           },
           stop: function() {
             $(this).find("a").blur();
           }
         });
-        
+
         // Input field to select contrast values explicitly.
         contrast_input.change(function() {
           var value = parseFloat(this.value);
-          
+
           // Check that input is numeric and in range.
           if (!BrainBrowser.utils.isNumeric(value)) {
             value = 0;
@@ -580,18 +769,18 @@ $(function() {
             var value = parseFloat(ui.value);
             volume.display.setBrightness(value);
             volume.display.refreshPanels();
-            
+
             brightness_input.val(value);
           },
           stop: function() {
             $(this).find("a").blur();
           }
         });
-        
+
         // Input field to select brightness values explicitly.
         brightness_input.change(function() {
           var value = parseFloat(this.value);
-          
+
           // Check that input is numeric and in range.
           if (!BrainBrowser.utils.isNumeric(value)) {
             value = 0;
@@ -608,6 +797,33 @@ $(function() {
       });
     });
 
+    /* This function simply takes an input hex background color
+     * and returns either "black" or "white" as the appropriate
+     * foreground color for text rendered over the background colour.
+     * Idea from https://24ways.org/2010/calculating-color-contrast/
+     * Equation is from http://www.w3.org/TR/AERT#color-contrast
+     */
+    function getContrastYIQ(hexcolor) {
+      var r;
+      var g;
+      var b;
+      var yiq;
+      if(Array.isArray(hexcolor)){
+        r = hexcolor[0];
+        g = hexcolor[1];
+        b = hexcolor[2];
+        yiq = hexcolor[3];
+        return (yiq >= 128) ? 'black' : 'white';
+      }else{
+        r = parseInt(hexcolor.substr(0, 2), 16);
+        g = parseInt(hexcolor.substr(2, 2), 16);
+        b = parseInt(hexcolor.substr(4, 2), 16);
+        yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+        return (yiq >= 128) ? 'black' : 'white';
+      }
+      
+    }
+
     /////////////////////////////////////////////////////
     // UI updates to be performed after each slice update.
     //////////////////////////////////////////////////////
@@ -617,7 +833,7 @@ $(function() {
       var vol_id = panel.volume_id;
       var world_coords, voxel_coords;
       var value;
-      
+
       if (BrainBrowser.utils.isFunction(volume.getWorldCoords)) {
         world_coords = volume.getWorldCoords();
         $("#world-x-" + vol_id).val(world_coords.x.toPrecision(6));
@@ -633,16 +849,29 @@ $(function() {
       }
 
       value = volume.getIntensityValue();
-      $("#intensity-value-" + vol_id)
-      .css("background-color", "#" + volume.color_map.colorFromValue(value, {
+
+      /* Set background color of intensity value to match colormap
+       * entry for that value.
+       */
+      var bg_color = volume.color_map.colorFromValue(value, {
         hex: true,
-        min: volume.min,
-        max: volume.max,
+        min: volume.intensity_min,
+        max: volume.intensity_max,
         contrast: panel.contrast,
         brightness: panel.brightness
-      }))
+      });
+
+      /* Given that the background color has a wide range, use a little
+       * cleverness to pick either white or black as the foreground color
+       * of the intensity value. This improves readability.
+       */
+      var fg_color = getContrastYIQ(bg_color);
+
+      $("#intensity-value-" + vol_id)
+      .css("background-color", "#" + bg_color)
+      .css("color", fg_color)
       .html(Math.floor(value));
-      
+
       if (volume.header && volume.header.time) {
         $("#time-slider-" + vol_id).slider("option", "value", volume.current_time);
         $("#time-val-" + vol_id).val(volume.current_time);
@@ -707,4 +936,3 @@ $(function() {
   });
 
 });
-

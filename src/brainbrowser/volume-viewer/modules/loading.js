@@ -324,7 +324,7 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
 
     viewer.loadVolume({
         volumes: viewer.volumes,
-        type: "overlay",
+        type: "overlayVolumes",
         template: description.template,
         views: description.views || ["xspace", "yspace", "zspace"],
         views_description: description.views_description,
@@ -351,6 +351,22 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
   viewer.setDefaultPanelSize = function(width, height) {
     default_panel_width = width;
     default_panel_height = height;
+  };
+
+  viewer.syncPosition = function(panel, volume, axis_name) {
+    var wc = volume.getWorldCoords();
+    viewer.volumes.forEach(function(synced_volume) {
+      if (synced_volume !== volume) {
+        var synced_panel = synced_volume.display.getPanel(axis_name);
+        synced_panel.volume.setWorldCoords(wc.x, wc.y, wc.z);
+        synced_panel.updated = true;
+        synced_volume.display.forEach(function(panel) {
+          if (panel !== synced_panel) {
+            panel.updateSlice();
+          }
+        });
+      }
+    });
   };
 
   ///////////////////////////
@@ -390,11 +406,6 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
       volume.color_map = default_color_map;
       volume.display = createVolumeDisplay(viewer.dom_element, vol_id, volume_description);
       volume.propagateEventTo("*", viewer);
-
-      ["xspace", "yspace", "zspace"].forEach(function(axis) {
-        volume.position[axis] = Math.floor(volume.header[axis].space_length / 2);
-        volume.position_continuous[axis] = Math.floor(volume.header[axis].space_length / 2);
-      });
 
       volume.display.forEach(function(panel) {
         panel.updateSlice(function() {
@@ -457,8 +468,36 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
     return template_elements;
   }
 
+  function createCanvas(canvas_id, panel_width, panel_height, z_index, buffer_params){
+    var canvas_layer = {};
+
+    var canvas = document.createElement("canvas");
+    canvas.id = canvas_id;
+    canvas.width = panel_width;
+    canvas.height = panel_height;
+    canvas.style.backgroundColor = "transparent";
+    canvas.style.position = "absolute";
+    canvas.top = 5;
+    canvas.left = 5;
+    canvas.style["z-index"] = z_index;
+
+    canvas_layer.canvas = canvas;
+
+    if(buffer_params){
+      var canvas_buffer = document.createElement("canvas");
+      canvas_buffer.width = buffer_params.width;
+      canvas_buffer.height = buffer_params.height;
+      canvas_layer.canvas_buffer = canvas_buffer;
+    }
+
+    return canvas_layer;
+
+    
+  }
+
   // Create canvases and add mouse interface.
   function createVolumeDisplay(dom_element, vol_id, volume_description) {
+
     var container = document.createElement("div");
     if(volume_description.id !== undefined){
       if(dom_element.id === "brainbrowser-" + volume_description.id){
@@ -488,78 +527,98 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
     
     views.forEach(function(axis_name) {
 
-      var canvas = document.createElement("canvas");
-      canvas.id = "canvas_" + axis_name + "_vol" + vol_id;
-      canvas.width = default_panel_width;
-      canvas.height = default_panel_height;
-      canvas.style.backgroundColor = "#000000";
-      canvas.style.position = "absolute";
-      canvas.top = 5;
-      canvas.left = 5;
-      canvas.style["z-index"] = 0;
-
-      var canvasBuffer = document.createElement("canvas");
-      canvasBuffer.id = "canvas_buffer_" + axis_name + "_vol" + vol_id;
-      canvasBuffer.width = volume.header[axis_name].width;
-      canvasBuffer.height = volume.header[axis_name].height;
-
       var div = document.createElement("div");
       div.id = "div_" + axis_name + "_vol" + vol_id;
-      div.appendChild(canvas);
       div.style.position = "relative";
       div.style.height = default_panel_height + 10 + "px";
       div.style.width = default_panel_width + 10 + "px";
       container.appendChild(div);
+
+      var buffer_params = {
+        width: volume.header[axis_name].width,
+        height: volume.header[axis_name].height
+      };
+
+      var canvas_layers = [];
+
+      var volumes = [volume];
+      var volumes_length = 1;
+      if(volume.volumes){
+        volumes_length = volume.volumes.length;
+        volumes = volume.volumes;
+      }
+
+      var i;
+      var canvas_layer;
+
+      for(i = 0; i < volumes_length; i++){
+        buffer_params = {
+          width: volumes[i].header[axis_name].width,
+          height: volumes[i].header[axis_name].height
+        };
+
+        canvas_layer = createCanvas("canvas_" + axis_name + "_vol" + vol_id, default_panel_width, default_panel_height, i, buffer_params);
+        if(i === 0){
+          canvas_layer.canvas.style.backgroundColor = "#000000";
+        }
+        canvas_layers.push(canvas_layer);
+      }
 
       var view_description;
       if(volume_description.views_description && volume_description.views_description[axis_name]){
         view_description = volume_description.views_description[axis_name];
       }
 
-      var canvas_layers = [];
-
       if(volume_description.canvas_layers){
-
-        for(var i = 0; i < volume_description.canvas_layers.length; i++){
-          var canvas_layer = document.createElement("canvas");
-          canvas_layer.id = "canvas_layer_" + axis_name + "_vol" + vol_id;
-          canvas_layer.width = default_panel_width;
-          canvas_layer.height = default_panel_height;
-          canvas_layer.style.position = "absolute";
-          canvas_layer.top = 5;
-          canvas_layer.left = 5;
-          canvas_layer.style["z-index"] = i + 1;
-
-          var canvas_layer_buffer = document.createElement("canvas");
-          canvas_layer_buffer.id = "canvas_layer_buffer_" + axis_name + "_vol" + vol_id;
-          canvas_layer_buffer.width = volume.header[axis_name].width;
-          canvas_layer_buffer.height = volume.header[axis_name].height;
-
-          canvas_layers.push({
-            canvas_buffer: canvas_layer_buffer,
-            canvas: canvas_layer,
-            draw: volume_description.canvas_layers[i].draw
-          });
-          div.appendChild(canvas_layer);
+        for(i = 0; i < volume_description.canvas_layers.length; i++){
+          canvas_layer = createCanvas("canvas_layer_" + axis_name + "_vol" + vol_id, default_panel_width, default_panel_height, canvas_layers.length, buffer_params);
+          canvas_layer.draw = volume_description.canvas_layers[i].draw;
+          canvas_layers.push(canvas_layer);
         }
       }
 
+      var panel = VolumeViewer.createPanel({
+        volume: volume,
+        volume_id: vol_id,
+        axis: axis_name,
+        canvas_div: div,
+        view_description: view_description,
+        canvas_layers: canvas_layers,
+        canvas: canvas_layers[canvas_layers.length - 1].canvas,
+        image_translate: {
+          x: default_panel_width/2,
+          y: default_panel_height/2
+        }
+      });
+
+      var drawVolumeSlice = function(buffer, ctx, params){
+        panel.drawVolumeSlice(this.current_vol_id, buffer, ctx, params);
+      };
+
+      for(i = 0; i < volumes_length; i++){
+        var current_vol_id = {
+          current_vol_id: i
+        };
+        canvas_layers[i].draw = drawVolumeSlice.bind(current_vol_id);
+      }
+
+      var canvas_layer_cursor = createCanvas("canvas_layer_" + panel.axis + "_cursor", default_panel_width, default_panel_height, canvas_layers.length);
+      canvas_layer_cursor.draw = panel.drawCursorLayer;
+
+      canvas_layers.push(canvas_layer_cursor);
+
+      for(i = 0; i < canvas_layers.length; i++){
+        div.appendChild(canvas_layers[i].canvas);
+      }
+
+      BrainBrowser.events.addEventModel(panel);
+
+      panel.mouse = BrainBrowser.utils.captureMouse(canvas_layer_cursor.canvas);
+      panel.touches = BrainBrowser.utils.captureTouch(canvas_layer_cursor.canvas);
+
       display.setPanel(
         axis_name,
-        VolumeViewer.createPanel({
-          volume: volume,
-          volume_id: vol_id,
-          axis: axis_name,
-          canvas_div: div,
-          canvas: canvas,
-          canvas_buffer: canvasBuffer,
-          view_description: view_description,
-          canvas_layers: canvas_layers,
-          image_translate: {
-            x: default_panel_width/2,
-            y: default_panel_height/2
-          }
-        })
+        panel
       );
     });
 
@@ -617,22 +676,9 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
             });
 
             if (viewer.synced){
-              viewer.volumes.forEach(function(synced_volume, synced_vol_id) {
-                var synced_panel;
-                
-                if (synced_vol_id !== vol_id) {
-                  synced_panel = synced_volume.display.getPanel(axis_name);
-                  synced_panel.updateVolumePosition(pointer.x, pointer.y);
-                  synced_volume.display.forEach(function(panel) {
-                    if (panel !== synced_panel) {
-                      panel.updateSlice();
-                    }
-                  });
-                }
-              });
+              viewer.syncPosition(panel, volume, axis_name);
             }
           }
-
           panel.updated = true;
         }
 
@@ -640,7 +686,6 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
           var drag_delta;
 
           if(shift_key) {
-
             drag_delta = panel.followPointer(pointer);
 
             panel.translateImage(drag_delta.dx, drag_delta.dy);
@@ -652,7 +697,6 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
                 if (synced_vol_id !== vol_id) {
                   synced_panel = synced_volume.display.getPanel(axis_name);
                   synced_panel.translateImage(drag_delta.dx, drag_delta.dy);
-
                 }
               });
             }
@@ -695,19 +739,7 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
             });
 
             if (viewer.synced){
-              viewer.volumes.forEach(function(synced_volume, synced_vol_id) {
-                var synced_panel;
-                
-                if (synced_vol_id !== vol_id) {
-                  synced_panel = synced_volume.display.getPanel(axis_name);
-                  synced_panel.updateVolumePosition(pointer.x, pointer.y);
-                  synced_volume.display.forEach(function(panel) {
-                    if (panel !== synced_panel) {
-                      panel.updateSlice();
-                    }
-                  });
-                }
-              });
+              viewer.syncPosition(panel, volume, axis_name);
             }
           }
 
@@ -845,6 +877,7 @@ BrainBrowser.VolumeViewer.modules.loading = function(viewer) {
       });
     })();
 
+    dom_element.appendChild(container);
     viewer.triggerEvent("volumeuiloaded", {
       container: container,
       volume: volume,

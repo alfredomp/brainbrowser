@@ -215,12 +215,6 @@
         width = width > 0 ? width : 0;
         height = height > 0 ? height : 0;
 
-        panel.canvas.width = width;
-        panel.canvas.height = height;
-
-        panel.canvas_div.style.width = width + 10;
-        panel.canvas_div.style.height = height + 10;
-
         if(panel.canvas_layers){
           for(var i = 0; i < panel.canvas_layers.length; i++){
             var canvas_layer = panel.canvas_layers[i].canvas;
@@ -228,6 +222,8 @@
             canvas_layer.height = height;
           }
         }
+
+        panel.canvas = panel.canvas_layers[panel.canvas_layers.length - 1].canvas;
 
         if(options.scale_image){
           panel.image_translate.x = panel.canvas.width/2;
@@ -285,7 +281,7 @@
         panel.image_translate.x += dx;
         panel.image_translate.y += dy;
         panel.updated = true;
-        
+
       },
 
       /**
@@ -298,9 +294,9 @@
       * ```
       */
       reset: function() {
+        panel.zoom = 1;
         panel.image_translate.x = panel.canvas.width/2;
         panel.image_translate.y = panel.canvas.height/2;
-        panel.zoom = Math.min((panel.canvas.width/(panel.slice.width_space.space_length*panel.slice.width_space.step)), panel.canvas.height/(panel.slice.height_space.space_length*panel.slice.height_space.step));
         panel.updated = true;
       },
 
@@ -329,7 +325,7 @@
 
         return {
           x: (x_position) * Math.abs(slice.width_space.step) + origin.x,
-          y: (slice.height_space.space_length - y_position) * Math.abs(slice.height_space.step) + origin.y
+          y: (y_position) * Math.abs(slice.height_space.step) + origin.y
         };
       },
 
@@ -376,6 +372,7 @@
       * ```
       */
       getVolumePosition: function(x, y) {
+
         var origin = getDrawingOrigin(panel);
         var slice = panel.slice;
         var cursor;
@@ -395,7 +392,7 @@
         step_slice_y = Math.abs(slice.height_space.step);
 
         slice_x = (x - origin.x) / step_slice_x;
-        slice_y = slice.height_space.space_length - (y - origin.y) / step_slice_y;
+        slice_y = (y - origin.y) / step_slice_y;
 
         if(slice_x < 0 || slice_x > slice.width_space.space_length || slice_y < 0 || slice_y > slice.height_space.space_length){
           return null;
@@ -443,11 +440,7 @@
 
         update_timeout = setTimeout(function() {
           var volume = panel.volume;
-          var slice;
-          
-          slice = volume.slice(panel.axis);
-
-          setSlice(panel, slice);
+          var slice = panel.slice;
 
           panel.triggerEvent("sliceupdate", {
             volume: volume,
@@ -510,96 +503,122 @@
           return;
         }
         
-        var canvas = panel.canvas;
-        var context = panel.context;
-        var frame_width = 4;
-        var half_frame_width = frame_width / 2;
-        var tm = null;
+        var header_axis = panel.volume.header[panel.axis];
+        var translate_x = panel.image_translate.x + (header_axis.width_space.start + Math.abs(header_axis.width_space.space_length*header_axis.width_space.step/2))*panel.zoom;
+        var translate_y = panel.image_translate.y + (header_axis.height_space.start + Math.abs(header_axis.height_space.space_length*header_axis.height_space.step/2))*panel.zoom;
+        var canvas_layer;
+        var ctx;
+
+        panel.transformation_matrix = [-panel.zoom, 0, 0, -panel.zoom, translate_x, translate_y];
         
-        context.globalAlpha = 255;
-        context.save();
-        context.setTransform(1, 0, 0, 1, 0, 0);
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        context.restore();
-
-        if(panel.disable_zoom){
-          panel.zoom = Math.min((panel.canvas.width/(panel.slice.width_space.space_length*panel.slice.width_space.step)), panel.canvas.height/(panel.slice.height_space.space_length*panel.slice.height_space.step));
-        }
-
-        if(panel.invert_x){
-          panel.transformation_matrix = [-panel.zoom, 0, 0, panel.zoom, panel.image_translate.x, panel.image_translate.y];
-        }else{
-          panel.transformation_matrix = [panel.zoom, 0, 0, panel.zoom, panel.image_translate.x, panel.image_translate.y];
-        }
-
-        tm = panel.transformation_matrix;
-        context.setTransform(tm[0], tm[1], tm[2], tm[3], tm[4], tm[5]);
-
-        drawSlice(panel);
-
-        if(panel.canvas_layers){
-          var params = {
-            tm: tm,
-            width: panel.slice.width_space.space_length,
-            width_spacing: Math.abs(panel.slice.width_space.step),
-            height: panel.slice.height_space.space_length,
-            height_spacing: Math.abs(panel.slice.height_space.step),
-            origin: getDrawingOrigin(panel),
-            axis: panel.axis,
-            cursor_color: cursor_color,
-            cursor: cursor
-          };
-          for(var i = 0; i < panel.canvas_layers.length; i++){
-            var canvas_layer = panel.canvas_layers[i];
-            var ctx = canvas_layer.canvas.getContext("2d");
-            ctx.save();
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.restore();
-            ctx.imageSmoothingEnabled = panel.smooth_image;
-            canvas_layer.draw(canvas_layer.canvas_buffer, ctx, params);
-          }
+        var params = {
+          tm: panel.transformation_matrix,
+          width: panel.slice.width_space.space_length,
+          width_spacing: Math.abs(panel.slice.width_space.step),
+          height: panel.slice.height_space.space_length,
+          height_spacing: Math.abs(panel.slice.height_space.step),
+          origin: getDrawingOrigin(panel),
+          axis: panel.axis,
+          cursor_color: cursor_color,
+          cursor: cursor
+        };
+        var i;
+        for(i = 0; i < panel.canvas_layers.length; i++){
+          canvas_layer = panel.canvas_layers[i];
+          ctx = canvas_layer.canvas.getContext("2d");
+          ctx.imageSmoothingEnabled = panel.smooth_image;
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.clearRect(0, 0, canvas_layer.canvas.width, canvas_layer.canvas.height);
+          ctx.restore();
+          canvas_layer.draw(canvas_layer.canvas_buffer, ctx, params);
         }
         
+        canvas_layer = panel.canvas_layers[0];
+        ctx = canvas_layer.canvas.getContext("2d");
+
         panel.triggerEvent("draw", {
           volume: panel.volume,
           cursor: cursor,
-          canvas: canvas,
-          context: context
+          canvas: canvas_layer,
+          context: ctx
         });
-        
-        //drawCursor(panel, cursor_color);
+
 
         if (active) {
-          context.save();
-          context.setTransform(1, 0, 0, 1, 0, 0);
-          context.strokeStyle = "#EC2121";
-          context.lineWidth = frame_width;
-          context.strokeRect(
+          canvas_layer = panel.canvas_layers[panel.canvas_layers.length - 1];
+          ctx = canvas_layer.canvas.getContext("2d");
+
+          var frame_width = 4;
+          var half_frame_width = frame_width / 2;
+
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.strokeStyle = "#EC2121";
+          ctx.lineWidth = frame_width;
+          ctx.strokeRect(
             half_frame_width,
             half_frame_width,
-            canvas.width - frame_width,
-            canvas.height - frame_width
+            ctx.canvas.width - frame_width,
+            ctx.canvas.height - frame_width
           );
-          context.restore();
+          ctx.restore();
         }
 
         panel.updated = false;
       },
 
+      drawVolumeSlice: function(volume_id, buffer, ctx, params){
+
+        var volume = panel.volume;
+        panel.slice = volume.slice(panel.axis);
+        ctx.setTransform(params.tm[0], params.tm[1], params.tm[2], params.tm[3], params.tm[4], params.tm[5]);
+        
+        var slice;
+        var image;
+        
+        if(volume.volumes){
+          slice = panel.slice.slice(volume_id, panel.axis);
+          image = volume.getSliceImage(volume_id, slice, panel.contrast, panel.brightness);
+          ctx.globalAlpha = volume.blend_ratios[volume_id];
+        }else{
+          slice = panel.slice;
+          image = volume.getSliceImage(slice, panel.zoom, panel.contrast, panel.brightness);
+        }
+        
+        if (image) {
+          var image_width = slice.width_space.space_length*slice.width_space.step;
+          var image_height = slice.height_space.space_length*slice.height_space.step;
+          var ctx_buffer = buffer.getContext("2d");
+          var origin = {};
+          origin.x = slice.width_space.start;
+          origin.y = slice.height_space.start;
+          ctx_buffer.putImageData(image, 0, 0);
+          ctx.imageSmoothingEnabled = panel.smooth_image;
+          ctx.drawImage(buffer, origin.x, origin.y, image_width, image_height );
+        }
+      },
+
       drawMousePointer : function(cursor_color, coords){
-        var tm = panel.transformation_matrix;
         var canvas = panel.canvas_layers[panel.canvas_layers.length - 1].canvas;
         var ctx = canvas.getContext("2d");
-        ctx.clearRect(-canvas.width, -canvas.height, 2*canvas.width, 2*canvas.height);
-        ctx.setTransform(tm[0], tm[1], tm[2], tm[3], tm[4], tm[5]);
-        drawCursor(panel, cursor_color, coords, ctx);
+
+        var params = {
+          tm: panel.transformation_matrix,
+          cursor_color: cursor_color,
+          cursor_coords: coords
+        };
+
+        ctx.imageSmoothingEnabled = false;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+
+        panel.drawCursorLayer(undefined, ctx, params);
       },
       setDrawCursor : function(draw){
         panel.draw_cursor = draw;
-      },
-      drawCurrentSlice : function(){
-        drawSlice(panel);
       },
       setCursorSize : function(size){
         panel.cursor_size = size;
@@ -608,7 +627,19 @@
       drawCursorLayer : function(buffer, ctx, params){
         var tm = params.tm;
         ctx.setTransform(tm[0], tm[1], tm[2], tm[3], tm[4], tm[5]);
-        drawCursor(panel, params.cursor_color, undefined, ctx);
+
+        if(panel.view_description){
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          for(var i = 0; i < panel.view_description.length; i++){
+            var desc = panel.view_description[i];
+            ctx.fillStyle = "rgba(255,255,255,1)";
+            ctx.fillText(desc.text, desc.x * ctx.canvas.width, desc.y*ctx.canvas.height);
+          }
+          ctx.restore();
+        }
+
+        drawCursor(panel, params.cursor_color, params.cursor_coords, ctx);
       }
 
     };
@@ -618,34 +649,6 @@
         panel[k] = options[k];
       }
     });
-
-    var canvas_layer_cursor = document.createElement("canvas");
-    canvas_layer_cursor.id = "canvas_layer_" + panel.axis + "_cursor";
-    canvas_layer_cursor.width = panel.canvas.width;
-    canvas_layer_cursor.height = panel.canvas.height;
-    canvas_layer_cursor.style.position = "absolute";
-    canvas_layer_cursor.top = 5;
-    canvas_layer_cursor.left = 5;
-    canvas_layer_cursor.style["z-index"] = panel.canvas_layers.length + 1;
-
-    panel.canvas_layers.push({
-      canvas: canvas_layer_cursor,
-      draw: panel.drawCursorLayer
-    });
-    options.canvas_div.appendChild(canvas_layer_cursor);
-
-    BrainBrowser.events.addEventModel(panel);
-
-    if (panel.canvas && BrainBrowser.utils.isFunction(panel.canvas.getContext)) {
-      panel.context = panel.canvas.getContext("2d");
-      panel.context_buffer = panel.canvas_buffer.getContext("2d");
-      var canvas = panel.canvas;
-      if(panel.canvas_layers && panel.canvas_layers.length > 0){
-        canvas = panel.canvas_layers[panel.canvas_layers.length - 1].canvas;
-      }
-      panel.mouse = BrainBrowser.utils.captureMouse(canvas);
-      panel.touches = BrainBrowser.utils.captureTouch(canvas);
-    }
 
     if (panel.volume) {
       setSlice(panel, panel.volume.slice(panel.axis));
@@ -661,7 +664,6 @@
   // Set the volume slice to be rendered on the panel.
   function setSlice(panel, slice) {
     panel.slice = slice;
-    panel.slice_image = panel.volume.getSliceImage(panel.slice, panel.zoom, panel.contrast, panel.brightness);
   }
 
   // Draw the cursor at its current position on the canvas.
@@ -696,12 +698,12 @@
 
     context.beginPath();
 
-    context.lineWidth = 0.25;
+    context.lineWidth = 0.5;
     dx = panel.slice.width_space.step;
     dy = panel.slice.height_space.step;
     
     origx = x - dx*cursor_size;
-    origy = y + dy*cursor_size;
+    origy = y - dy*cursor_size;
 
     dx += 2*dx*cursor_size;
     dy +=  2*dy*cursor_size;
@@ -709,10 +711,11 @@
 
     context.moveTo(origx, origy);
     context.lineTo(origx + dx, origy);
-    context.lineTo(origx + dx, origy - dy);
-    context.lineTo(origx, origy - dy);
+    context.lineTo(origx + dx, origy + dy);
+    context.lineTo(origx, origy + dy);
     context.lineTo(origx, origy);
     context.stroke();
+    context.globalAlpha = 0.5;
     context.closePath();
 
     if (panel.anchor) {
@@ -729,6 +732,7 @@
       context.fillText(distance.toFixed(2), x, y);
       context.restore();
 
+
       context.lineWidth = 1;
       context.beginPath();
       context.arc(panel.anchor.x, panel.anchor.y, 1, 0, 2 * Math.PI);
@@ -737,6 +741,7 @@
       context.lineTo(cursor.x, cursor.y);
       context.stroke();
       
+
     }
 
     context.restore();
@@ -744,40 +749,11 @@
 
   }
 
-  // Draw the current slice to the canvas.
-  function drawSlice(panel) {
-    var image = panel.slice_image;
-    var origin;
-    
-    var image_width = Math.abs(panel.slice.width_space.space_length*panel.slice.width_space.step);
-    var image_height = Math.abs(panel.slice.height_space.space_length*panel.slice.height_space.step);
-
-    if (image) {
-      origin = getDrawingOrigin(panel);
-
-      panel.context.imageSmoothingEnabled = panel.smooth_image;
-      panel.context_buffer.putImageData(image, 0, 0);
-      panel.context.drawImage(panel.canvas_buffer, origin.x, origin.y, image_width, image_height );
-      
-    }
-
-    if(panel.view_description){
-      panel.context.save();
-      panel.context.setTransform(1, 0, 0, 1, 0, 0);
-      for(var i = 0; i < panel.view_description.length; i++){
-        var desc = panel.view_description[i];
-        panel.context.fillStyle = "rgba(255,255,255,1)";
-        panel.context.fillText(desc.text, desc.x * panel.canvas.width, desc.y*panel.canvas.height);
-      }
-      panel.context.restore();
-    }
-  }
-
   // Get the origin at which slices should be drawn.
   function getDrawingOrigin(panel) {
     var slice = panel.slice;
-    var x = -Math.abs(slice.width_space.step * slice.width_space.space_length)/2;
-    var y = -Math.abs(slice.height_space.step * slice.height_space.space_length)/2;
+    var x = slice.width_space.start;
+    var y = slice.height_space.start;
     
     return {
       x: x,

@@ -10,6 +10,8 @@ SET (CMAKE_C_FLAGS ${FLAGS} CACHE STRING "compile flags" FORCE)
 set(ITK_IO_MODULES_USED 
 		ITKIONIFTI
 		ITKIONRRD
+		MGHIO
+		ITKImageGrid
 	)
 find_package(ITK COMPONENTS
   ITKCommon

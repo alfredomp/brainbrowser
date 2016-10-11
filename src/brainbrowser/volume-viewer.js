@@ -415,46 +415,39 @@
 
         var key = event.which;
         var space_name, time;
+
         var volume_coordinates;
         var keys = {};
         
         if(viewer.interaction_type === 1){
           keys = {
             // Left
-            37: function(axis_name) {
+            37: function() {
               if (volume.position[axis_name] > 0) {
                 volume.position[axis_name]--;
                 volume.position_continuous[axis_name]--;
               }
-              var event = new CustomEvent('BrainBrowser-arrows');
-              document.dispatchEvent(event);
             },
             // Up
-            38: function(axis_name) {
+            38: function() {
               if (volume.position[axis_name] < volume.header[axis_name].space_length) {
                 volume.position[axis_name]++;
                 volume.position_continuous[axis_name]++;
               }
-              var event = new CustomEvent('BrainBrowser-arrows');
-              document.dispatchEvent(event);
             },
             // Right
-            39: function(axis_name) {
+            39: function() {
               if (volume.position[axis_name] < volume.header[axis_name].space_length) {
                 volume.position[axis_name]++;
                 volume.position_continuous[axis_name]++;
               }
-              var event = new CustomEvent('BrainBrowser-arrows');
-              document.dispatchEvent(event);
             },
             // Down
-            40: function(axis_name) {
+            40: function() {
               if (volume.position[axis_name] > 0) {
                 volume.position[axis_name]--;
                 volume.position_continuous[axis_name]--;
               }
-              var event = new CustomEvent('BrainBrowser-arrows');
-              document.dispatchEvent(event);
             }
           };
         }else{
@@ -477,7 +470,6 @@
               space_name = panel.slice.width_space.name;
               if (volume.position[space_name] > 0) {
                 volume.position[space_name]--;
-                volume.position_continuous[space_name]--;
               }
             },
             // Up
@@ -485,7 +477,6 @@
               space_name = panel.slice.height_space.name;
               if (volume.position[space_name] < panel.slice.height_space.space_length) {
                 volume.position[space_name]++;
-                volume.position_continuous[space_name]++;
               }
             },
             // Right
@@ -493,7 +484,6 @@
               space_name = panel.slice.width_space.name;
               if (volume.position[space_name] < panel.slice.width_space.space_length) {
                 volume.position[space_name]++;
-                volume.position_continuous[space_name]++;
               }
             },
             // Down
@@ -501,14 +491,13 @@
               space_name = panel.slice.height_space.name;
               if (volume.position[space_name] > 0) {
                 volume.position[space_name]--;
-                volume.position_continuous[space_name]--;
               }
             }
           };
         }
         if (typeof keys[key] === "function") {
           event.preventDefault();
-          keys[key](axis_name);
+          keys[key]();
 
           //panel.updated = true;
           viewer.redrawVolumes();
@@ -523,7 +512,6 @@
               if (synced_volume !== volume) {
                 Object.keys(volume.position).forEach(function(key){
                   synced_volume.position[key] = volume.position[key];
-                  synced_volume.position_continuous[key] = synced_volume.position_continuous[key];
                 });
                 synced_volume.display.forEach(function(panel) {
                   if (panel !== synced_panel) {
@@ -541,12 +529,11 @@
         if (key === 32) {
           event.preventDefault();
 
-          if (volume.data.time) {
-
+          if (volume.header.time) {
             if (event.shiftKey) {
               time = Math.max(0, volume.current_time - 1);
             } else {
-              time = Math.min(volume.current_time + 1, volume.data.time.space_length - 1);
+              time = Math.min(volume.current_time + 1, volume.header.time.space_length - 1);
             }
 
             volume.current_time = time;
@@ -554,7 +541,7 @@
             if (viewer.synced){
               viewer.volumes.forEach(function(synced_volume) {
                 if (synced_volume !== volume) {
-                  synced_volume.current_time = Math.max(0, Math.min(time, synced_volume.data.time.space_length - 1));
+                  synced_volume.current_time = Math.max(0, Math.min(time, synced_volume.header.time.space_length - 1));
                 }
               });
             }
